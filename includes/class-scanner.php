@@ -1,0 +1,436 @@
+<?php
+/**
+ * Resumable local discovery and verification worker.
+ *
+ * @package SimpleBrokenLinkChecker
+ */
+
+namespace SimpleBrokenLinkChecker;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Runs resumable discovery and URL verification work.
+ */
+final class Scanner {
+	const LOCK_OPTION = 'sblc_scan_lock';
+
+	/**
+	 * Start a new scan.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public static function start() {
+		$active = Database::get_active_scan();
+		if ( $active ) {
+			return new \WP_Error( 'sblc_scan_active', __( 'A scan is already in progress.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+		}
+		if ( ! self::acquire_lock() ) {
+			return new \WP_Error( 'sblc_scan_locked', __( 'Another scan request is being started. Please try again.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+		}
+		Database::reset_for_scan();
+		$scan_id = Database::insert_scan();
+		if ( ! $scan_id ) {
+			self::release_lock();
+			return new \WP_Error( 'sblc_scan_create_failed', __( 'The scan could not be created.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+		}
+		self::set_lock_scan( $scan_id );
+		return self::step( $scan_id );
+	}
+
+	/**
+	 * Process one bounded worker request.
+	 *
+	 * @param int $scan_id Scan ID.
+	 * @return array|\WP_Error
+	 */
+	public static function step( $scan_id ) {
+		$scan = Database::get_scan( $scan_id );
+		if ( ! $scan ) {
+			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+		}
+		if ( in_array( $scan->state, array( 'completed', 'cancelled', 'failed' ), true ) ) {
+			return self::progress( $scan );
+		}
+		if ( 'cancelling' === $scan->state ) {
+			Database::update_scan(
+				$scan_id,
+				array(
+					'state'       => 'cancelled',
+					'finished_at' => Database::now(),
+				)
+			);
+			self::schedule_next();
+			self::release_lock();
+			return self::progress( Database::get_scan( $scan_id ) );
+		}
+
+		$deadline = microtime( true ) + (int) Settings::get( 'execution_seconds', 8 );
+		try {
+			if ( 'discovering' === $scan->state ) {
+				/*
+				 * Discovery and verification are deliberately serialized. Once a
+				 * source batch has produced URLs, drain that queue before reading the
+				 * next source batch so the UI can show decisions as they are made.
+				 */
+				$pending = Database::resources_for_scan( $scan->id, 1 );
+				if ( empty( $pending ) && microtime( true ) < $deadline ) {
+					self::discover( $scan, $deadline );
+				} elseif ( ! empty( $pending ) ) {
+					self::check_resources( $scan, $deadline );
+				}
+			}
+			$scan = Database::get_scan( $scan_id );
+			$pending = $scan ? Database::resources_for_scan( $scan->id, 1 ) : array();
+			if ( $scan && ( 'checking' === $scan->state || ( 'discovering' === $scan->state && ! empty( $pending ) ) ) && microtime( true ) < $deadline ) {
+				self::check_resources( $scan, $deadline );
+			}
+			$scan  = Database::get_scan( $scan_id );
+			$stats = $scan ? Database::scan_stats( $scan_id ) : array(
+				'total_resources'   => 0,
+				'checked_resources' => 0,
+			);
+			if ( $scan && 'checking' === $scan->state && $stats['checked_resources'] >= $stats['total_resources'] ) {
+				Database::update_scan(
+					$scan_id,
+					array(
+						'state'       => 'completed',
+						'finished_at' => Database::now(),
+						'counts'      => wp_json_encode( Database::counts() ),
+					)
+				);
+				self::notify_if_enabled();
+				self::schedule_next();
+				self::release_lock();
+				$scan = Database::get_scan( $scan_id );
+			}
+			if ( $scan ) {
+				self::touch_lock( $scan_id );
+			}
+			return self::progress( $scan );
+		} catch ( \Throwable $error ) {
+			Database::update_scan(
+				$scan_id,
+				array(
+					'state'         => 'failed',
+					'error_message' => sanitize_text_field( $error->getMessage() ),
+					'finished_at'   => Database::now(),
+				)
+			);
+			self::release_lock();
+			return new \WP_Error( 'sblc_scan_failed', __( 'The scan stopped unexpectedly. Existing findings were preserved.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+		}
+	}
+
+	/**
+	 * Ask the worker to stop after the current bounded operation.
+	 *
+	 * @param int $scan_id Scan ID.
+	 * @return array|\WP_Error
+	 */
+	public static function cancel( $scan_id ) {
+		$scan = Database::get_scan( $scan_id );
+		if ( ! $scan ) {
+			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+		}
+		Database::update_scan( $scan_id, array( 'state' => 'cancelling' ) );
+		return self::step( $scan_id );
+	}
+
+	/**
+	 * Resume an active scan from cron.
+	 *
+	 * @return void
+	 */
+	public static function scheduled_step() {
+		$scan = Database::get_active_scan();
+		if ( $scan ) {
+			self::step( $scan->id );
+			return;
+		}
+		$schedule = sanitize_key( Settings::get( 'schedule', 'manual' ) );
+		if ( 'manual' === $schedule ) {
+			return;
+		}
+		$next = absint( get_option( 'sblc_next_scan_at', 0 ) );
+		if ( ! $next ) {
+			self::schedule_next();
+			return;
+		}
+		if ( time() >= $next ) {
+			$result = self::start();
+			if ( is_wp_error( $result ) ) {
+				update_option( 'sblc_next_scan_at', time() + HOUR_IN_SECONDS, false );
+			}
+		}
+	}
+
+	/**
+	 * Get latest scan status.
+	 *
+	 * @return array
+	 */
+	public static function latest_progress() {
+		$scan = Database::get_active_scan();
+		if ( ! $scan ) {
+			$scan = Database::get_latest_scan();
+		}
+		return self::progress( $scan );
+	}
+
+	/**
+	 * Discover a bounded source page.
+	 *
+	 * @param object $scan     Scan.
+	 * @param float  $deadline Deadline.
+	 * @return void
+	 */
+	private static function discover( $scan, $deadline ) {
+		$providers          = Sources::providers();
+		$index              = array_search( $scan->provider, $providers, true );
+		$index              = false === $index ? 0 : $index;
+		$provider           = $providers[ $index ];
+		$page               = max( 1, absint( $scan->page ) );
+		$offset             = absint( $scan->resource_cursor );
+		$batch              = Sources::batch( $provider, $page, absint( Settings::get( 'batch_size', 5 ) ), $offset );
+		$processed          = absint( $scan->processed_sources );
+		$occurrences        = absint( $scan->discovered_occurrences );
+		$processed_in_batch = 0;
+
+		foreach ( $batch['items'] as $source ) {
+			if ( microtime( true ) >= $deadline ) {
+				break;
+			}
+			$occurrences += Sources::store_source( $source, $scan->id );
+			++$processed;
+			++$processed_in_batch;
+		}
+
+		$consumed_all = count( $batch['items'] ) <= $processed_in_batch;
+		if ( ! $consumed_all ) {
+			$offset += $processed_in_batch;
+		} elseif ( empty( $batch['page_complete'] ) ) {
+			$offset += count( $batch['items'] );
+		} elseif ( ! empty( $batch['has_more'] ) ) {
+			++$page;
+			$offset = 0;
+		} elseif ( isset( $providers[ $index + 1 ] ) ) {
+				$provider = $providers[ $index + 1 ];
+				$page     = 1;
+				$offset   = 0;
+		} else {
+			Database::update_scan(
+				$scan->id,
+				array(
+					'state'                  => 'checking',
+					'provider'               => 'done',
+					'page'                   => 1,
+					'resource_cursor'        => 0,
+					'processed_sources'      => $processed,
+					'discovered_occurrences' => $occurrences,
+				)
+			);
+			return;
+		}
+		Database::update_scan(
+			$scan->id,
+			array(
+				'provider'               => $provider,
+				'page'                   => $page,
+				'resource_cursor'        => $offset,
+				'processed_sources'      => $processed,
+				'discovered_occurrences' => $occurrences,
+			)
+		);
+	}
+
+	/**
+	 * Check discovered resources in bounded batches.
+	 *
+	 * @param object $scan     Scan.
+	 * @param float  $deadline Deadline.
+	 * @return void
+	 */
+	private static function check_resources( $scan, $deadline ) {
+		$resources = Database::resources_for_scan( $scan->id, absint( Settings::get( 'batch_size', 5 ) ) );
+		foreach ( $resources as $resource ) {
+			if ( microtime( true ) >= $deadline ) {
+				break;
+			}
+			if ( ! empty( $resource->ignored ) ) {
+				Database::mark_checked( $resource->id, $scan->id );
+				continue;
+			}
+			/* A user-started or scheduled scan is a fresh verification pass. */
+			$result = Http_Checker::check( $resource->url, absint( $resource->retry_count ) );
+			Database::save_result( $resource->id, $scan->id, $result );
+		}
+		$stats = Database::scan_stats( $scan->id );
+		Database::update_scan( $scan->id, array( 'checked_resources' => $stats['checked_resources'] ) );
+	}
+
+	/**
+	 * Return API-friendly progress data.
+	 *
+	 * @param object|null $scan Scan.
+	 * @return array
+	 */
+	private static function progress( $scan ) {
+		if ( ! $scan ) {
+			return array(
+				'scan_id' => 0,
+				'state'   => 'idle',
+				'phase'   => 'idle',
+				'percent' => 0,
+				'message' => __( 'No scan has been run yet.', 'simple-broken-link-checker' ),
+				'counts'  => Database::counts(),
+				'stats'   => array(
+					'total_resources'   => 0,
+					'checked_resources' => 0,
+				),
+			);
+		}
+		$stats   = Database::scan_stats( $scan->id );
+		$phase   = 'discovering' === $scan->state ? 'discovery' : ( 'checking' === $scan->state ? 'verification' : $scan->state );
+		if ( 'discovering' === $scan->state && $stats['checked_resources'] < $stats['total_resources'] ) {
+			$phase = 'verification';
+		}
+		$percent = 0;
+		if ( 'checking' === $scan->state || ( 'discovering' === $scan->state && 'verification' === $phase ) || in_array( $scan->state, array( 'completed', 'cancelled', 'failed' ), true ) ) {
+			$percent = $stats['total_resources'] ? min( 100, (int) floor( ( $stats['checked_resources'] / $stats['total_resources'] ) * 100 ) ) : ( 'completed' === $scan->state ? 100 : 0 );
+		}
+		$counts = json_decode( $scan->counts, true );
+		if ( 'discovering' === $scan->state ) {
+			if ( 'verification' === $phase ) {
+				/* translators: 1: checked URL count, 2: discovered URL count. */
+				$message = sprintf( __( 'Verifying discovered URLs before reading more sources (%1$d of %2$d complete).', 'simple-broken-link-checker' ), absint( $stats['checked_resources'] ), absint( $stats['total_resources'] ) );
+			} else {
+				$message = __( 'Reading WordPress content. Each URL is verified before more sources are fetched.', 'simple-broken-link-checker' );
+			}
+		} elseif ( 'checking' === $scan->state ) {
+			$message = __( 'Verifying unique URLs with bounded local requests.', 'simple-broken-link-checker' );
+		} elseif ( 'completed' === $scan->state ) {
+			$message = __( 'Scan completed.', 'simple-broken-link-checker' );
+		} else {
+			$message = __( 'Scan stopped.', 'simple-broken-link-checker' );
+		}
+		return array(
+			'scan_id'                => absint( $scan->id ),
+			'state'                  => sanitize_key( $scan->state ),
+			'phase'                  => $phase,
+			'percent'                => $percent,
+			'message'                => $message,
+			'counts'                 => is_array( $counts ) && $counts ? $counts : Database::counts(),
+			'stats'                  => $stats,
+			'processed_sources'      => absint( $scan->processed_sources ),
+			'discovered_occurrences' => absint( $scan->discovered_occurrences ),
+			'error_message'          => sanitize_text_field( $scan->error_message ),
+		);
+	}
+
+	/**
+	 * Acquire a recoverable lock.
+	 *
+	 * @return bool
+	 */
+	private static function acquire_lock() {
+		$token = wp_generate_uuid4();
+		$lock  = array(
+			'token'     => $token,
+			'locked_at' => time(),
+			'scan_id'   => 0,
+		);
+		if ( add_option( self::LOCK_OPTION, $lock, '', false ) ) {
+			return true;
+		}
+		$old = get_option( self::LOCK_OPTION, array() );
+		if ( is_array( $old ) && ! empty( $old['locked_at'] ) && time() - absint( $old['locked_at'] ) < 1800 ) {
+			return false;
+		}
+		global $wpdb;
+		$old_serialized = maybe_serialize( $old );
+		$new_serialized = maybe_serialize( $lock );
+		$query          = $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $new_serialized, self::LOCK_OPTION, $old_serialized );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic compare-and-swap lock update; all values are prepared and the options table is trusted.
+		return 1 === (int) $wpdb->query( $query );
+	}
+
+	/**
+	 * Put scan ID into the lock.
+	 *
+	 * @param int $scan_id Scan ID.
+	 * @return void
+	 */
+	private static function set_lock_scan( $scan_id ) {
+		$lock = get_option( self::LOCK_OPTION, array() );
+		if ( is_array( $lock ) ) {
+			$lock['scan_id']   = absint( $scan_id );
+			$lock['locked_at'] = time();
+			update_option( self::LOCK_OPTION, $lock, false );
+		}
+	}
+
+	/**
+	 * Refresh lock timestamp.
+	 *
+	 * @param int $scan_id Scan ID.
+	 * @return void
+	 */
+	private static function touch_lock( $scan_id ) {
+		$lock = get_option( self::LOCK_OPTION, array() );
+		if ( is_array( $lock ) && isset( $lock['scan_id'] ) && absint( $lock['scan_id'] ) === absint( $scan_id ) ) {
+			$lock['locked_at'] = time();
+			update_option( self::LOCK_OPTION, $lock, false );
+		}
+	}
+
+	/**
+	 * Release only this worker's lock.
+	 *
+	 * @return void
+	 */
+	private static function release_lock() {
+		delete_option( self::LOCK_OPTION );
+	}
+
+	/**
+	 * Set the next scheduled scan time when scheduling is enabled.
+	 *
+	 * @return void
+	 */
+	private static function schedule_next() {
+		$schedule = sanitize_key( Settings::get( 'schedule', 'manual' ) );
+		if ( 'manual' === $schedule ) {
+			delete_option( 'sblc_next_scan_at' );
+			return;
+		}
+		update_option( 'sblc_next_scan_at', time() + Settings::schedule_interval( $schedule ), false );
+	}
+
+	/**
+	 * Send an optional local completion summary.
+	 *
+	 * @return void
+	 */
+	private static function notify_if_enabled() {
+		if ( ! Settings::get( 'email_notifications' ) ) {
+			return;
+		}
+		$email = sanitize_email( Settings::get( 'notification_email' ) );
+		if ( ! is_email( $email ) ) {
+			return;
+		}
+		$counts  = Database::counts();
+		$subject = __( 'Simple Broken Link Checker scan complete', 'simple-broken-link-checker' );
+		$message = sprintf(
+			/* translators: 1: Unique URL count, 2: Broken count, 3: Needs-review count, 4: Redirect count, 5: Healthy count. */
+			__( "Your local link scan is complete.\n\nUnique URLs: %1\$d\nBroken: %2\$d\nNeeds review: %3\$d\nRedirects: %4\$d\nHealthy: %5\$d\n\nOpen the WordPress admin to review evidence and source locations.", 'simple-broken-link-checker' ),
+			absint( $counts['all'] ),
+			absint( $counts['broken'] ),
+			absint( $counts['needs_review'] ),
+			absint( $counts['redirect'] ),
+			absint( $counts['healthy'] )
+		);
+		wp_mail( $email, $subject, $message );
+	}
+}

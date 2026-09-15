@@ -1,0 +1,21 @@
+# Local development and test artifacts
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Release archives and generated reports
+*.zip
+outputs/
+work/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# WordPress local environment files
+wp-config.php
+wp-content/uploads/
+wp-content/cache/

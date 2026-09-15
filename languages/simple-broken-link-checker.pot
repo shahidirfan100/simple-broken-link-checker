@@ -1,0 +1,921 @@
+# Copyright (C) 2026 Shahid Irfan
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Simple Broken Link Checker 1.0.5\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/simple-broken-link-checker\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-09-15T05:46:40+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: simple-broken-link-checker\n"
+
+#. Plugin Name of the plugin
+#: simple-broken-link-checker.php
+#: admin/class-admin.php:24
+#: admin/class-admin.php:206
+msgid "Simple Broken Link Checker"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: simple-broken-link-checker.php
+msgid "https://wordpress.org/plugins/simple-broken-link-checker/"
+msgstr ""
+
+#. Description of the plugin
+#: simple-broken-link-checker.php
+msgid "Find and review broken links, redirects, and missing images locally with clear evidence and safe repairs."
+msgstr ""
+
+#. Author of the plugin
+#: simple-broken-link-checker.php
+msgid "Shahid Irfan"
+msgstr ""
+
+#. Author URI of the plugin
+#: simple-broken-link-checker.php
+msgid "https://profiles.wordpress.org/shahidirfan100/"
+msgstr ""
+
+#: admin/class-admin.php:24
+#: admin/class-admin.php:25
+msgid "Link Checker"
+msgstr ""
+
+#: admin/class-admin.php:25
+#: admin/class-admin.php:81
+#: admin/class-admin.php:210
+msgid "Findings"
+msgstr ""
+
+#: admin/class-admin.php:26
+#: admin/class-admin.php:114
+#: admin/class-admin.php:211
+msgid "Settings"
+msgstr ""
+
+#: admin/class-admin.php:54
+msgid "The request could not be completed."
+msgstr ""
+
+#: admin/class-admin.php:55
+msgid "Discovering sources"
+msgstr ""
+
+#: admin/class-admin.php:56
+msgid "Verifying resources"
+msgstr ""
+
+#: admin/class-admin.php:57
+msgid "Scan progress"
+msgstr ""
+
+#: admin/class-admin.php:58
+msgid "Stop scan"
+msgstr ""
+
+#: admin/class-admin.php:59
+msgid "All"
+msgstr ""
+
+#: admin/class-admin.php:60
+msgid "Broken"
+msgstr ""
+
+#: admin/class-admin.php:61
+msgid "Redirects"
+msgstr ""
+
+#: admin/class-admin.php:62
+msgid "Needs review"
+msgstr ""
+
+#: admin/class-admin.php:63
+msgid "Blocked"
+msgstr ""
+
+#: admin/class-admin.php:64
+msgid "Healthy"
+msgstr ""
+
+#: admin/class-admin.php:65
+#: includes/class-rest.php:263
+#: includes/class-rest.php:344
+msgid "Ignored"
+msgstr ""
+
+#: admin/class-admin.php:66
+msgid "Unverified"
+msgstr ""
+
+#: admin/class-admin.php:67
+#: includes/class-database.php:86
+#: includes/class-database.php:116
+msgid "Queued"
+msgstr ""
+
+#: admin/class-admin.php:68
+msgid "Link scope"
+msgstr ""
+
+#: admin/class-admin.php:69
+msgid "All links"
+msgstr ""
+
+#: admin/class-admin.php:70
+msgid "Internal links"
+msgstr ""
+
+#: admin/class-admin.php:71
+msgid "External links"
+msgstr ""
+
+#: admin/class-admin.php:72
+msgid "Internal"
+msgstr ""
+
+#: admin/class-admin.php:73
+msgid "External"
+msgstr ""
+
+#: admin/class-admin.php:74
+msgid "Check internal links"
+msgstr ""
+
+#: admin/class-admin.php:75
+msgid "Check external links"
+msgstr ""
+
+#: admin/class-admin.php:76
+msgid "Rate Limited"
+msgstr ""
+
+#: admin/class-admin.php:77
+msgid "Temporary Error"
+msgstr ""
+
+#: admin/class-admin.php:78
+msgid "SSL Error"
+msgstr ""
+
+#: admin/class-admin.php:79
+msgid "DNS Error"
+msgstr ""
+
+#: admin/class-admin.php:80
+#: includes/class-http-checker.php:237
+msgid "Timeout"
+msgstr ""
+
+#: admin/class-admin.php:82
+msgid "One request per unique URL, with every source location retained."
+msgstr ""
+
+#: admin/class-admin.php:83
+msgid "Run new scan"
+msgstr ""
+
+#: admin/class-admin.php:84
+msgid "Export CSV"
+msgstr ""
+
+#: admin/class-admin.php:85
+msgid "Finding summary"
+msgstr ""
+
+#: admin/class-admin.php:86
+msgid "Unique URLs"
+msgstr ""
+
+#: admin/class-admin.php:87
+msgid "Occurrences"
+msgstr ""
+
+#: admin/class-admin.php:88
+msgid "Search URL"
+msgstr ""
+
+#: admin/class-admin.php:89
+msgid "Resource type"
+msgstr ""
+
+#: admin/class-admin.php:90
+msgid "All types"
+msgstr ""
+
+#: admin/class-admin.php:91
+msgid "Links"
+msgstr ""
+
+#: admin/class-admin.php:92
+msgid "Images"
+msgstr ""
+
+#: admin/class-admin.php:93
+msgid "Bulk action"
+msgstr ""
+
+#: admin/class-admin.php:94
+msgid "Bulk actions"
+msgstr ""
+
+#: admin/class-admin.php:95
+msgid "Queue recheck"
+msgstr ""
+
+#: admin/class-admin.php:96
+msgid "Ignore"
+msgstr ""
+
+#: admin/class-admin.php:97
+msgid "Restore"
+msgstr ""
+
+#: admin/class-admin.php:98
+msgid "Apply"
+msgstr ""
+
+#: admin/class-admin.php:99
+msgid "Bulk URL replacement is intentionally unavailable."
+msgstr ""
+
+#: admin/class-admin.php:100
+msgid "Select all"
+msgstr ""
+
+#: admin/class-admin.php:101
+msgid "Status"
+msgstr ""
+
+#: admin/class-admin.php:102
+msgid "URL"
+msgstr ""
+
+#: admin/class-admin.php:103
+msgid "HTTP"
+msgstr ""
+
+#: admin/class-admin.php:104
+msgid "Type"
+msgstr ""
+
+#: admin/class-admin.php:105
+msgid "Sources"
+msgstr ""
+
+#: admin/class-admin.php:106
+msgid "Action"
+msgstr ""
+
+#: admin/class-admin.php:107
+msgid "Showing"
+msgstr ""
+
+#: admin/class-admin.php:108
+msgid "of"
+msgstr ""
+
+#: admin/class-admin.php:109
+msgid "Previous"
+msgstr ""
+
+#: admin/class-admin.php:110
+msgid "Next"
+msgstr ""
+
+#: admin/class-admin.php:111
+msgid "source"
+msgstr ""
+
+#: admin/class-admin.php:112
+msgid "sources"
+msgstr ""
+
+#: admin/class-admin.php:113
+msgid "Evidence"
+msgstr ""
+
+#: admin/class-admin.php:115
+msgid "Requests stay on this WordPress server. The plugin does not use an account, cloud scanner, tracking, or link credits."
+msgstr ""
+
+#: admin/class-admin.php:116
+msgid "Verification safety"
+msgstr ""
+
+#: admin/class-admin.php:117
+msgid "Resources per worker request"
+msgstr ""
+
+#: admin/class-admin.php:118
+msgid "Small batches keep wp-admin responsive."
+msgstr ""
+
+#: admin/class-admin.php:119
+msgid "Request timeout, seconds"
+msgstr ""
+
+#: admin/class-admin.php:120
+msgid "Maximum redirect hops"
+msgstr ""
+
+#: admin/class-admin.php:121
+msgid "Temporary failure retries"
+msgstr ""
+
+#: admin/class-admin.php:122
+msgid "Content sources"
+msgstr ""
+
+#: admin/class-admin.php:123
+msgid "Public post types"
+msgstr ""
+
+#: admin/class-admin.php:124
+msgid "Leave all unchecked to include every public post type except attachments and menu items."
+msgstr ""
+
+#: admin/class-admin.php:125
+msgid "Scan approved comments"
+msgstr ""
+
+#: admin/class-admin.php:126
+msgid "Scan navigation menu URLs"
+msgstr ""
+
+#: admin/class-admin.php:127
+msgid "Check featured images"
+msgstr ""
+
+#: admin/class-admin.php:128
+msgid "Read scalar custom-field and builder data"
+msgstr ""
+
+#: admin/class-admin.php:129
+msgid "Limit custom-field keys (one per line, optional)"
+msgstr ""
+
+#: admin/class-admin.php:130
+msgid "Builder metadata is read-only in this release; it is never rewritten blindly."
+msgstr ""
+
+#: admin/class-admin.php:131
+msgid "Exclusions and lifecycle"
+msgstr ""
+
+#: admin/class-admin.php:132
+msgid "Excluded domains (one per line)"
+msgstr ""
+
+#: admin/class-admin.php:133
+msgid "Excluded URL fragments (one per line)"
+msgstr ""
+
+#: admin/class-admin.php:134
+msgid "Scheduled scans"
+msgstr ""
+
+#: admin/class-admin.php:135
+msgid "Manual only"
+msgstr ""
+
+#: admin/class-admin.php:136
+msgid "Daily"
+msgstr ""
+
+#: admin/class-admin.php:137
+msgid "Weekly"
+msgstr ""
+
+#: admin/class-admin.php:138
+msgid "Scheduled work starts a bounded scan from WP-Cron. Manual scanning remains available if cron is delayed."
+msgstr ""
+
+#: admin/class-admin.php:139
+msgid "Email a local summary when a scan completes"
+msgstr ""
+
+#: admin/class-admin.php:140
+msgid "Notification email"
+msgstr ""
+
+#: admin/class-admin.php:141
+msgid "Delete findings when the plugin is uninstalled"
+msgstr ""
+
+#: admin/class-admin.php:142
+msgid "Save settings"
+msgstr ""
+
+#: admin/class-admin.php:143
+msgid "Replacement URL"
+msgstr ""
+
+#: admin/class-admin.php:144
+msgid "Replace URL"
+msgstr ""
+
+#: admin/class-admin.php:145
+msgid "Add nofollow"
+msgstr ""
+
+#: admin/class-admin.php:146
+msgid "Unlink"
+msgstr ""
+
+#: admin/class-admin.php:147
+msgid "Read-only source."
+msgstr ""
+
+#: admin/class-admin.php:148
+msgid "This source can be reviewed but is not automatically edited."
+msgstr ""
+
+#: admin/class-admin.php:149
+msgid "Untitled source"
+msgstr ""
+
+#: admin/class-admin.php:150
+msgid "Open source"
+msgstr ""
+
+#: admin/class-admin.php:151
+msgid "Undone"
+msgstr ""
+
+#: admin/class-admin.php:152
+msgid "Undo"
+msgstr ""
+
+#: admin/class-admin.php:153
+msgid "Close evidence"
+msgstr ""
+
+#: admin/class-admin.php:154
+msgid "Recheck"
+msgstr ""
+
+#: admin/class-admin.php:155
+msgid "Mark manually verified"
+msgstr ""
+
+#: admin/class-admin.php:156
+msgid "Classification"
+msgstr ""
+
+#: admin/class-admin.php:157
+msgid "Confidence"
+msgstr ""
+
+#: admin/class-admin.php:158
+msgid "HTTP result"
+msgstr ""
+
+#: admin/class-admin.php:159
+msgid "Final URL"
+msgstr ""
+
+#: admin/class-admin.php:160
+msgid "Response time"
+msgstr ""
+
+#: admin/class-admin.php:161
+msgid "Last checked"
+msgstr ""
+
+#: admin/class-admin.php:162
+msgid "Not checked"
+msgstr ""
+
+#: admin/class-admin.php:163
+msgid "Explanation"
+msgstr ""
+
+#: admin/class-admin.php:164
+msgid "Request history"
+msgstr ""
+
+#: admin/class-admin.php:165
+msgid "No request history."
+msgstr ""
+
+#: admin/class-admin.php:166
+msgid "Redirect chain"
+msgstr ""
+
+#: admin/class-admin.php:167
+msgid "Source locations"
+msgstr ""
+
+#: admin/class-admin.php:168
+msgid "No source locations remain in the current scan."
+msgstr ""
+
+#: admin/class-admin.php:169
+msgid "Repair history"
+msgstr ""
+
+#: admin/class-admin.php:170
+msgid "Loading settings…"
+msgstr ""
+
+#: admin/class-admin.php:171
+msgid "Loading findings…"
+msgstr ""
+
+#: admin/class-admin.php:172
+msgid "No findings match these filters."
+msgstr ""
+
+#: admin/class-admin.php:173
+msgid "Scan started. Discovery and verification will run in small bounded requests."
+msgstr ""
+
+#: admin/class-admin.php:174
+msgid "Select resources and a bulk action first."
+msgstr ""
+
+#: admin/class-admin.php:175
+msgid "Resources updated."
+msgstr ""
+
+#: admin/class-admin.php:176
+msgid "Resource updated."
+msgstr ""
+
+#: admin/class-admin.php:177
+msgid "Restore the source content saved before this repair?"
+msgstr ""
+
+#: admin/class-admin.php:178
+msgid "Repair undone."
+msgstr ""
+
+#: admin/class-admin.php:179
+msgid "Source updated."
+msgstr ""
+
+#: admin/class-admin.php:180
+msgid "Settings saved."
+msgstr ""
+
+#: admin/class-admin.php:181
+msgid "This will change stored WordPress content and create an undo record. Continue?"
+msgstr ""
+
+#: admin/class-admin.php:182
+msgid "Unlink this occurrence while preserving its visible text?"
+msgstr ""
+
+#: admin/class-admin.php:183
+msgid "Stop the current scan after its active bounded request?"
+msgstr ""
+
+#: admin/class-admin.php:205
+msgid "LOCAL SITE TOOL"
+msgstr ""
+
+#: admin/class-admin.php:209
+msgid "Plugin navigation"
+msgstr ""
+
+#: admin/class-admin.php:215
+msgid "JavaScript is required for the interactive scanner. WordPress content is not changed by simply opening this page."
+msgstr ""
+
+#: admin/class-admin.php:229
+msgid "You are not allowed to export findings."
+msgstr ""
+
+#: includes/class-database.php:87
+msgid "This URL has been rediscovered and is waiting for its verification request."
+msgstr ""
+
+#: includes/class-database.php:117
+msgid "This URL has been discovered and is waiting for its verification request."
+msgstr ""
+
+#: includes/class-extractor.php:199
+#: includes/class-extractor.php:246
+msgid "The selected URL was not found in the source content."
+msgstr ""
+
+#: includes/class-http-checker.php:29
+#: includes/class-http-checker.php:232
+msgid "DNS error"
+msgstr ""
+
+#: includes/class-http-checker.php:29
+msgid "Request not sent"
+msgstr ""
+
+#: includes/class-http-checker.php:30
+msgid "The domain could not be resolved from this server, so no request was sent."
+msgstr ""
+
+#: includes/class-http-checker.php:30
+msgid "This URL was not requested because it failed the local safety checks."
+msgstr ""
+
+#. translators: %d: Maximum number of allowed redirect hops.
+#: includes/class-http-checker.php:74
+#, php-format
+msgid "The link redirected more than the configured limit of %d hops."
+msgstr ""
+
+#: includes/class-http-checker.php:78
+msgid "The redirect chain was stopped because its next destination failed the local safety checks."
+msgstr ""
+
+#: includes/class-http-checker.php:87
+msgid "Redirect loop"
+msgstr ""
+
+#: includes/class-http-checker.php:87
+msgid "The redirect chain returned to a URL that was already visited."
+msgstr ""
+
+#: includes/class-http-checker.php:100
+msgid "The URL works, but it reaches a different destination through a redirect chain."
+msgstr ""
+
+#: includes/class-http-checker.php:102
+msgid "The resource responded successfully."
+msgstr ""
+
+#: includes/class-http-checker.php:105
+msgid "The server returned a redirect that could not be fully followed."
+msgstr ""
+
+#. translators: %d: HTTP response status code, such as 404 or 410.
+#: includes/class-http-checker.php:109
+#, php-format
+msgid "The target returned definitive HTTP %d evidence. It is highly likely that the resource no longer exists."
+msgstr ""
+
+#: includes/class-http-checker.php:115
+msgid "The remote server asked the scanner to slow down. This does not mean the link is broken."
+msgstr ""
+
+#: includes/class-http-checker.php:121
+msgid "The remote server returned a temporary error. The scanner will leave this for a later recheck instead of calling it broken."
+msgstr ""
+
+#: includes/class-http-checker.php:124
+msgid "The remote website rejected automated verification. This does not necessarily mean the link is broken."
+msgstr ""
+
+#: includes/class-http-checker.php:126
+msgid "The scanner could not obtain enough evidence to call this link broken."
+msgstr ""
+
+#: includes/class-http-checker.php:219
+msgid "Network error"
+msgstr ""
+
+#: includes/class-http-checker.php:220
+msgid "The scanner could not complete a safe request. This is not enough evidence to call the link broken."
+msgstr ""
+
+#: includes/class-http-checker.php:227
+msgid "SSL error"
+msgstr ""
+
+#: includes/class-http-checker.php:228
+msgid "The HTTPS certificate or TLS negotiation could not be verified."
+msgstr ""
+
+#: includes/class-http-checker.php:233
+msgid "The domain could not be resolved from this server."
+msgstr ""
+
+#: includes/class-http-checker.php:238
+msgid "The server did not respond within the configured timeout."
+msgstr ""
+
+#: includes/class-http-checker.php:330
+msgid "No response"
+msgstr ""
+
+#: includes/class-installer.php:41
+msgid "Every minute (Simple Broken Link Checker)"
+msgstr ""
+
+#: includes/class-repair.php:27
+msgid "The selected source occurrence was not found."
+msgstr ""
+
+#: includes/class-repair.php:30
+msgid "This source is read-only. The plugin will not modify builder or metadata data automatically."
+msgstr ""
+
+#: includes/class-repair.php:34
+msgid "This repair action is not supported."
+msgstr ""
+
+#: includes/class-repair.php:37
+msgid "You do not have permission to edit this source."
+msgstr ""
+
+#: includes/class-repair.php:43
+msgid "The source content could not be loaded."
+msgstr ""
+
+#: includes/class-repair.php:50
+msgid "Enter a valid HTTP or HTTPS replacement URL."
+msgstr ""
+
+#: includes/class-repair.php:58
+msgid "Only URL replacement is supported for menu items."
+msgstr ""
+
+#: includes/class-repair.php:64
+msgid "The menu item changed since this finding was recorded. Recheck it before editing."
+msgstr ""
+
+#: includes/class-repair.php:73
+msgid "No source content was changed."
+msgstr ""
+
+#: includes/class-repair.php:76
+msgid "This source type does not have a safe editor."
+msgstr ""
+
+#: includes/class-repair.php:100
+msgid "The source was not changed because the undo record could not be created."
+msgstr ""
+
+#: includes/class-repair.php:109
+msgid "The repair was not applied because WordPress could not save the source."
+msgstr ""
+
+#: includes/class-repair.php:112
+msgid "WordPress could not save the repaired source."
+msgstr ""
+
+#: includes/class-repair.php:119
+#: includes/class-repair.php:180
+#: includes/class-rest.php:276
+msgid "Recheck needed"
+msgstr ""
+
+#: includes/class-repair.php:120
+msgid "The source was changed. Recheck this resource to collect fresh evidence."
+msgstr ""
+
+#: includes/class-repair.php:129
+msgid "The source was updated and the change was recorded for undo."
+msgstr ""
+
+#: includes/class-repair.php:142
+msgid "The repair record was not found."
+msgstr ""
+
+#: includes/class-repair.php:145
+msgid "This repair has already been undone."
+msgstr ""
+
+#: includes/class-repair.php:157
+msgid "You do not have permission to undo this repair."
+msgstr ""
+
+#: includes/class-repair.php:161
+msgid "Undo was blocked because the source changed after this repair."
+msgstr ""
+
+#: includes/class-repair.php:162
+msgid "Undo was blocked because the source changed after this repair. Review the source manually."
+msgstr ""
+
+#: includes/class-repair.php:166
+msgid "WordPress could not restore the original source."
+msgstr ""
+
+#: includes/class-repair.php:181
+msgid "The source was restored. Recheck this resource to collect fresh evidence."
+msgstr ""
+
+#: includes/class-repair.php:188
+msgid "The original source was restored."
+msgstr ""
+
+#: includes/class-rest.php:143
+msgid "You are not allowed to use Simple Broken Link Checker."
+msgstr ""
+
+#: includes/class-rest.php:187
+#: includes/class-rest.php:242
+msgid "The requested resource was not found."
+msgstr ""
+
+#: includes/class-rest.php:264
+msgid "This resource is hidden from action-focused filters until it is restored."
+msgstr ""
+
+#: includes/class-rest.php:277
+msgid "The resource was restored to the review queue."
+msgstr ""
+
+#: includes/class-rest.php:293
+msgid "Manually verified"
+msgstr ""
+
+#: includes/class-rest.php:294
+msgid "An administrator marked this resource as verified without an automated request."
+msgstr ""
+
+#: includes/class-rest.php:301
+msgid "This resource action is not supported."
+msgstr ""
+
+#: includes/class-rest.php:319
+msgid "Choose valid resources and an action."
+msgstr ""
+
+#: includes/class-rest.php:330
+msgid "Queued for recheck"
+msgstr ""
+
+#: includes/class-rest.php:331
+msgid "This resource will be checked by the next scan."
+msgstr ""
+
+#: includes/class-rest.php:362
+msgid "The selected resources were updated."
+msgstr ""
+
+#: includes/class-scanner.php:26
+msgid "A scan is already in progress."
+msgstr ""
+
+#: includes/class-scanner.php:29
+msgid "Another scan request is being started. Please try again."
+msgstr ""
+
+#: includes/class-scanner.php:35
+msgid "The scan could not be created."
+msgstr ""
+
+#: includes/class-scanner.php:50
+#: includes/class-scanner.php:134
+msgid "The requested scan was not found."
+msgstr ""
+
+#: includes/class-scanner.php:121
+msgid "The scan stopped unexpectedly. Existing findings were preserved."
+msgstr ""
+
+#: includes/class-scanner.php:285
+msgid "No scan has been run yet."
+msgstr ""
+
+#. translators: 1: checked URL count, 2: discovered URL count.
+#: includes/class-scanner.php:306
+#, php-format
+msgid "Verifying discovered URLs before reading more sources (%1$d of %2$d complete)."
+msgstr ""
+
+#: includes/class-scanner.php:308
+msgid "Reading WordPress content. Each URL is verified before more sources are fetched."
+msgstr ""
+
+#: includes/class-scanner.php:311
+msgid "Verifying unique URLs with bounded local requests."
+msgstr ""
+
+#: includes/class-scanner.php:313
+msgid "Scan completed."
+msgstr ""
+
+#: includes/class-scanner.php:315
+msgid "Scan stopped."
+msgstr ""
+
+#: includes/class-scanner.php:424
+msgid "Simple Broken Link Checker scan complete"
+msgstr ""
+
+#. translators: 1: Unique URL count, 2: Broken count, 3: Needs-review count, 4: Redirect count, 5: Healthy count.
+#: includes/class-scanner.php:427
+#, php-format
+msgid ""
+"Your local link scan is complete.\n"
+"\n"
+"Unique URLs: %1$d\n"
+"Broken: %2$d\n"
+"Needs review: %3$d\n"
+"Redirects: %4$d\n"
+"Healthy: %5$d\n"
+"\n"
+"Open the WordPress admin to review evidence and source locations."
+msgstr ""
+
+#. translators: %s: Title of the post that received the comment.
+#: includes/class-sources.php:190
+#, php-format
+msgid "Comment on %s"
+msgstr ""

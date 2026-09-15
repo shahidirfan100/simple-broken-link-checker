@@ -1,0 +1,383 @@
+(function (window, document) {
+	'use strict';
+
+	var config = window.SBLC_DATA || {};
+	var root = document.getElementById('sblc-app');
+	if (!root) {
+		return;
+	}
+
+	var state = {
+		screen: root.getAttribute('data-screen') || config.page || 'findings',
+		status: 'all',
+		type: 'all',
+		scope: 'all',
+		search: '',
+		page: 1,
+		perPage: 20,
+		monitoring: false,
+		monitorTimer: null,
+		lastProgress: null
+	};
+
+	window.SBLC = window.SBLC || {};
+
+	function t(value) {
+		return config.strings && config.strings[value] ? config.strings[value] : value;
+	}
+
+	function escapeHtml(value) {
+		return String(value === null || typeof value === 'undefined' ? '' : value)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+	}
+
+	function displayStatus(status) {
+		var labels = {
+			unverified: 'Unverified', pending: 'Queued', broken: 'Broken', redirect: 'Redirects', blocked: 'Blocked',
+			rate_limited: 'Rate Limited', temporary_error: 'Temporary Error', ssl_error: 'SSL Error',
+			dns_error: 'DNS Error', timeout: 'Timeout', healthy: 'Healthy', ignored: 'Ignored'
+		};
+		return t(labels[status] || String(status || 'unverified').replace(/_/g, ' ').replace(/\b\w/g, function (letter) { return letter.toUpperCase(); }));
+	}
+
+	function translateMarkup(html) {
+		var template = document.createElement('template');
+		template.innerHTML = html;
+		var walker = document.createTreeWalker(template.content, window.NodeFilter.SHOW_TEXT);
+		var node;
+		while ((node = walker.nextNode())) {
+			var text = node.nodeValue.trim();
+			if (text && config.strings && config.strings[text]) {
+				node.nodeValue = node.nodeValue.replace(text, config.strings[text]);
+			}
+		}
+		template.content.querySelectorAll('[aria-label], [placeholder]').forEach(function (element) {
+			['aria-label', 'placeholder'].forEach(function (attribute) {
+				var value = element.getAttribute(attribute);
+				if (value && config.strings && config.strings[value]) {
+					element.setAttribute(attribute, config.strings[value]);
+				}
+			});
+		});
+		return template.innerHTML;
+	}
+
+	function api(path, options) {
+		var endpoint = config.restUrl + path;
+		var queryAt = path.indexOf('?');
+		if (queryAt !== -1 && config.restUrl.indexOf('?rest_route=') !== -1) {
+			endpoint = config.restUrl + path.slice(0, queryAt) + '&' + path.slice(queryAt + 1);
+		}
+		options = options || {};
+		options.headers = options.headers || {};
+		options.headers['X-WP-Nonce'] = config.nonce;
+		options.headers['Content-Type'] = 'application/json';
+		return fetch(endpoint, options).then(function (response) {
+			return response.json().catch(function () { return {}; }).then(function (body) {
+				if (!response.ok) {
+					throw new Error(body.message || t('The request could not be completed.'));
+				}
+				return body;
+			});
+		});
+	}
+
+	function post(path, body) {
+		return api(path, { method: 'POST', body: JSON.stringify(body || {}) });
+	}
+
+	function notice(message, type) {
+		var existing = root.querySelector('.sblc-notice-live');
+		if (existing) {
+			existing.remove();
+		}
+		var element = document.createElement('div');
+		element.className = 'sblc-notice sblc-notice-live ' + (type ? 'sblc-notice-' + type : '');
+		element.setAttribute('role', type === 'error' ? 'alert' : 'status');
+		element.textContent = message;
+		var main = root.querySelector('.sblc-main');
+		if (main) {
+			main.insertBefore(element, main.firstChild);
+		}
+	}
+
+	function button(label, action, extraClass, extra) {
+		return '<button type="button" class="sblc-button ' + (extraClass || 'sblc-button-secondary') + '" data-action="' + escapeHtml(action) + '"' + (extra || '') + '>' + escapeHtml(label) + '</button>';
+	}
+
+	function patchFindings(screen, markup) {
+		var staging = document.createElement('div');
+		staging.innerHTML = markup;
+
+		function patchInner(selector) {
+			var current = screen.querySelector(selector);
+			var next = staging.querySelector(selector);
+			if (current && next && current.innerHTML !== next.innerHTML) {
+				current.innerHTML = next.innerHTML;
+			}
+		}
+
+		patchInner('.sblc-toolbar-actions');
+		var currentBody = screen.querySelector('.sblc-table tbody');
+		var nextBody = staging.querySelector('.sblc-table tbody');
+		if (currentBody && nextBody) {
+			var emptyRow = currentBody.querySelector('.sblc-empty');
+			if (emptyRow) {
+				emptyRow.closest('tr').remove();
+			}
+			var currentRows = {};
+			Array.prototype.forEach.call(currentBody.querySelectorAll('[data-resource-row]'), function (row) {
+				currentRows[row.getAttribute('data-resource-row')] = row;
+			});
+			Array.prototype.forEach.call(nextBody.children, function (nextRow) {
+				var key = nextRow.getAttribute('data-resource-row');
+				var currentRow = key ? currentRows[key] : null;
+				if (currentRow) {
+					if (currentRow.innerHTML !== nextRow.innerHTML) {
+						currentRow.innerHTML = nextRow.innerHTML;
+					}
+					currentBody.appendChild(currentRow);
+					delete currentRows[key];
+				} else {
+					currentBody.appendChild(nextRow.cloneNode(true));
+				}
+			});
+			Object.keys(currentRows).forEach(function (key) { currentRows[key].remove(); });
+			if (!nextBody.querySelector('[data-resource-row]') && currentBody.innerHTML !== nextBody.innerHTML) {
+				currentBody.innerHTML = nextBody.innerHTML;
+			}
+		}
+		patchInner('.sblc-pagination');
+
+		var currentStatus = screen.querySelector('.sblc-scan-status');
+		var nextStatus = staging.querySelector('.sblc-scan-status');
+		if (currentStatus && nextStatus) {
+			if (currentStatus.innerHTML !== nextStatus.innerHTML) {
+				currentStatus.innerHTML = nextStatus.innerHTML;
+			}
+		} else if (currentStatus) {
+			currentStatus.remove();
+		} else if (nextStatus) {
+			screen.querySelector('.sblc-toolbar').insertAdjacentElement('afterend', nextStatus);
+		}
+
+		var currentMetrics = screen.querySelectorAll('.sblc-metric-value');
+		var nextMetrics = staging.querySelectorAll('.sblc-metric-value');
+		Array.prototype.forEach.call(currentMetrics, function (metric, index) {
+			if (nextMetrics[index] && metric.textContent !== nextMetrics[index].textContent) {
+				metric.textContent = nextMetrics[index].textContent;
+			}
+		});
+
+		Array.prototype.forEach.call(screen.querySelectorAll('[data-action="filter-status"]'), function (filter) {
+			var status = filter.getAttribute('data-status');
+			var nextFilter = staging.querySelector('[data-action="filter-status"][data-status="' + status + '"]');
+			if (!nextFilter) { return; }
+			filter.className = nextFilter.className;
+			var count = filter.querySelector('.sblc-filter-count');
+			var nextCount = nextFilter.querySelector('.sblc-filter-count');
+			if (count && nextCount && count.textContent !== nextCount.textContent) {
+				count.textContent = nextCount.textContent;
+			}
+		});
+	}
+
+	function renderFindings(data) {
+		var progress = data.progress || {};
+		var counts = data.counts || progress.counts || {};
+		var active = ['discovering', 'checking', 'cancelling'].indexOf(progress.state) !== -1;
+		var scanStatus = active
+			? translateMarkup('<div class="sblc-scan-status" role="status"><strong>' + escapeHtml(progress.phase === 'discovery' ? t('Discovering sources') : t('Verifying resources')) + '</strong><span>' + escapeHtml(progress.message || '') + '</span><div class="sblc-progress" aria-label="Scan progress"><span style="width:' + escapeHtml(progress.percent || 0) + '%"></span></div><span>' + escapeHtml(progress.percent || 0) + '%</span>' + button(t('Stop scan'), 'cancel-scan', 'sblc-button-danger', ' data-scan-id="' + escapeHtml(progress.scan_id) + '"') + '</div>')
+			: '';
+		var statuses = [
+			['all', t('All'), counts.all], ['broken', t('Broken'), counts.broken], ['redirect', t('Redirects'), counts.redirect], ['needs_review', t('Needs review'), counts.needs_review], ['blocked', t('Blocked'), counts.blocked], ['healthy', t('Healthy'), counts.healthy], ['ignored', t('Ignored'), counts.ignored]
+		];
+		var filters = statuses.map(function (item) {
+			return '<button type="button" class="sblc-filter ' + (state.status === item[0] ? 'is-active' : '') + '" data-action="filter-status" data-status="' + item[0] + '">' + escapeHtml(item[1]) + '<span class="sblc-filter-count">' + escapeHtml(item[2] || 0) + '</span></button>';
+		}).join('');
+		var list = data.list || { items: [], total: 0 };
+		var rows = list.items || [];
+		var table = rows.length ? rows.map(renderRow).join('') : '<tr><td colspan="7"><div class="sblc-empty">' + escapeHtml(t('No findings match these filters.')) + '</div></td></tr>';
+		var totalPages = Math.max(1, Math.ceil((list.total || 0) / state.perPage));
+		var screen = root.querySelector('[data-screen-content]');
+		var markup = translateMarkup('<section class="sblc-toolbar"><div><h2>Findings</h2><p>One request per unique URL, with every source location retained.</p></div><div class="sblc-toolbar-actions">' + (active ? '' : button(t('Run new scan'), 'start-scan', 'sblc-button-primary')) + button(t('Export CSV'), 'export-findings', 'sblc-button-secondary') + '</div></section>' + scanStatus + '<section class="sblc-metrics" aria-label="Finding summary"><div class="sblc-metric sblc-metric-danger"><span class="sblc-metric-label">Broken</span><strong class="sblc-metric-value">' + escapeHtml(counts.broken || 0) + '</strong></div><div class="sblc-metric sblc-metric-warn"><span class="sblc-metric-label">Needs review</span><strong class="sblc-metric-value">' + escapeHtml(counts.needs_review || 0) + '</strong></div><div class="sblc-metric"><span class="sblc-metric-label">Redirects</span><strong class="sblc-metric-value">' + escapeHtml(counts.redirect || 0) + '</strong></div><div class="sblc-metric sblc-metric-good"><span class="sblc-metric-label">Healthy</span><strong class="sblc-metric-value">' + escapeHtml(counts.healthy || 0) + '</strong></div><div class="sblc-metric"><span class="sblc-metric-label">Unique URLs</span><strong class="sblc-metric-value">' + escapeHtml(counts.all || 0) + '</strong></div><div class="sblc-metric"><span class="sblc-metric-label">Occurrences</span><strong class="sblc-metric-value">' + escapeHtml(progress.discovered_occurrences || 0) + '</strong></div></section><section class="sblc-panel"><div class="sblc-filters"><div>' + filters + '</div><div class="sblc-filter-controls"><label class="screen-reader-text" for="sblc-search">Search URL</label><input id="sblc-search" class="sblc-input" type="search" placeholder="Search URL" value="' + escapeHtml(state.search) + '" data-search-field /><label class="screen-reader-text" for="sblc-type">Resource type</label><select id="sblc-type" class="sblc-select" data-type-field><option value="all">All types</option><option value="link"' + (state.type === 'link' ? ' selected' : '') + '>Links</option><option value="image"' + (state.type === 'image' ? ' selected' : '') + '>Images</option></select></div></div><div class="sblc-filters"><label class="screen-reader-text" for="sblc-bulk">Bulk action</label><select id="sblc-bulk" class="sblc-select" data-bulk-select><option value="">Bulk actions</option><option value="recheck">Queue recheck</option><option value="ignore">Ignore</option><option value="restore">Restore</option></select>' + button(t('Apply'), 'bulk-action', 'sblc-button-secondary') + '<span class="sblc-subline">Bulk URL replacement is intentionally unavailable.</span></div><div class="sblc-table-wrap"><table class="sblc-table"><thead><tr><th class="sblc-check-col"><label class="screen-reader-text" for="sblc-select-all">Select all</label><input id="sblc-select-all" type="checkbox" data-select-all /></th><th>Status</th><th>URL</th><th>HTTP</th><th>Type</th><th>Sources</th><th>Action</th></tr></thead><tbody>' + table + '</tbody></table></div><div class="sblc-pagination"><p>' + escapeHtml(t('Showing')) + ' ' + escapeHtml(rows.length ? ((state.page - 1) * state.perPage + 1) : 0) + '–' + escapeHtml(Math.min(state.page * state.perPage, list.total || 0)) + ' ' + escapeHtml(t('of')) + ' ' + escapeHtml(list.total || 0) + '</p><div class="sblc-actions">' + button(t('Previous'), 'page-prev', 'sblc-button-secondary', totalPages > 1 && state.page > 1 ? '' : ' disabled') + button(t('Next'), 'page-next', 'sblc-button-secondary', totalPages > 1 && state.page < totalPages ? '' : ' disabled') + '</div></div></section>');
+		if (screen.querySelector('.sblc-toolbar')) {
+			patchFindings(screen, markup);
+		} else {
+			screen.innerHTML = markup;
+		}
+		var typeSelect = screen.querySelector('[data-type-field]');
+		if (typeSelect && !screen.querySelector('[data-scope-field]')) {
+			var scopeSelect = document.createElement('select');
+			scopeSelect.id = 'sblc-scope';
+			scopeSelect.className = 'sblc-select';
+			scopeSelect.setAttribute('data-scope-field', '');
+			scopeSelect.setAttribute('aria-label', t('Link scope'));
+			scopeSelect.innerHTML = '<option value="all">' + escapeHtml(t('All links')) + '</option><option value="internal">' + escapeHtml(t('Internal links')) + '</option><option value="external">' + escapeHtml(t('External links')) + '</option>';
+			scopeSelect.value = state.scope;
+			typeSelect.parentNode.insertBefore(scopeSelect, typeSelect);
+		}
+		if (active && !state.monitoring && !state.monitorTimer) {
+			monitor(progress.scan_id);
+		}
+	}
+
+	function renderRow(item) {
+		var status = item.status || 'unverified';
+		var sourceText = item.occurrence_count + ' ' + t(Number(item.occurrence_count) === 1 ? 'source' : 'sources');
+		return translateMarkup('<tr data-resource-row="' + escapeHtml(item.id) + '"><td class="sblc-check-col"><input type="checkbox" value="' + escapeHtml(item.id) + '" data-resource-check /></td><td><span class="sblc-status sblc-status-' + escapeHtml(status) + '">' + escapeHtml(displayStatus(status)) + '</span><span class="sblc-subline">' + escapeHtml(item.confidence || 'unverified') + '</span></td><td><a class="sblc-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.url) + '">' + escapeHtml(item.url) + '</a><span class="sblc-subline">' + escapeHtml(item.explanation || '') + '</span></td><td>' + escapeHtml(item.http_code || '—') + '</td><td>' + escapeHtml(item.resource_type || 'link') + '<span class="sblc-subline">' + escapeHtml(displayStatus(item.link_scope || 'external')) + '</span></td><td>' + escapeHtml(sourceText) + '</td><td><div class="sblc-actions">' + '<button type="button" class="sblc-icon-button" data-action="open-resource" data-resource-id="' + escapeHtml(item.id) + '">Evidence</button>' + (status === 'ignored' ? '<button type="button" class="sblc-icon-button" data-action="resource-action" data-resource-id="' + escapeHtml(item.id) + '" data-resource-action="restore">Restore</button>' : '<button type="button" class="sblc-icon-button" data-action="resource-action" data-resource-id="' + escapeHtml(item.id) + '" data-resource-action="ignore">Ignore</button>') + '</div></td></tr>');
+	}
+
+	function renderSettings(data) {
+		var settings = data.settings || {};
+		var postTypes = data.post_types || [];
+		var typeFields = postTypes.map(function (type) {
+			var name = type.name || type.slug || '';
+			var label = type.label || name;
+			return '<label class="sblc-check"><input type="checkbox" name="post_types[]" value="' + escapeHtml(name) + '"' + ((settings.post_types || []).indexOf(name) !== -1 ? ' checked' : '') + ' /> <span>' + escapeHtml(label) + ' <code>' + escapeHtml(name) + '</code></span></label>';
+		}).join('');
+		root.querySelector('[data-screen-content]').innerHTML = translateMarkup('<section class="sblc-panel sblc-settings"><h2>Settings</h2><p class="sblc-settings-intro">Requests stay on this WordPress server. The plugin does not use an account, cloud scanner, tracking, or link credits.</p><form data-settings-form><div class="sblc-settings-section"><h3>Verification safety</h3><div class="sblc-field-grid"><div class="sblc-field"><label for="sblc-batch">Resources per worker request</label><input class="sblc-input" id="sblc-batch" name="batch_size" type="number" min="1" max="25" value="' + escapeHtml(settings.batch_size) + '" /><p class="sblc-help">Small batches keep wp-admin responsive.</p></div><div class="sblc-field"><label for="sblc-timeout">Request timeout, seconds</label><input class="sblc-input" id="sblc-timeout" name="timeout" type="number" min="3" max="60" value="' + escapeHtml(settings.timeout) + '" /></div><div class="sblc-field"><label for="sblc-redirects">Maximum redirect hops</label><input class="sblc-input" id="sblc-redirects" name="max_redirects" type="number" min="0" max="15" value="' + escapeHtml(settings.max_redirects) + '" /></div><div class="sblc-field"><label for="sblc-retries">Temporary failure retries</label><input class="sblc-input" id="sblc-retries" name="max_retries" type="number" min="0" max="4" value="' + escapeHtml(settings.max_retries) + '" /></div></div></div><div class="sblc-settings-section"><h3>Content sources</h3><div class="sblc-field-grid"><div class="sblc-field sblc-field-full"><label>Public post types</label><div class="sblc-field-grid">' + typeFields + '</div><p class="sblc-help">Leave all unchecked to include every public post type except attachments and menu items.</p></div><label class="sblc-check"><input type="checkbox" name="include_comments"' + (settings.include_comments ? ' checked' : '') + ' /> <span>Scan approved comments</span></label><label class="sblc-check"><input type="checkbox" name="include_menus"' + (settings.include_menus ? ' checked' : '') + ' /> <span>Scan navigation menu URLs</span></label><label class="sblc-check"><input type="checkbox" name="include_featured_images"' + (settings.include_featured_images ? ' checked' : '') + ' /> <span>Check featured images</span></label><label class="sblc-check"><input type="checkbox" name="include_custom_fields"' + (settings.include_custom_fields ? ' checked' : '') + ' /> <span>Read scalar custom-field and builder data</span></label><label class="sblc-check"><input type="checkbox" name="check_internal_links"' + (settings.check_internal_links ? ' checked' : '') + ' /> <span>Check internal links</span></label><label class="sblc-check"><input type="checkbox" name="check_external_links"' + (settings.check_external_links ? ' checked' : '') + ' /> <span>Check external links</span></label><div class="sblc-field sblc-field-full"><label for="sblc-meta-keys">Limit custom-field keys (one per line, optional)</label><textarea class="sblc-input" id="sblc-meta-keys" name="custom_meta_keys" rows="3">' + escapeHtml((settings.custom_meta_keys || []).join('\n')) + '</textarea><p class="sblc-help">Builder metadata is read-only in this release; it is never rewritten blindly.</p></div></div></div><div class="sblc-settings-section"><h3>Exclusions and lifecycle</h3><div class="sblc-field-grid"><div class="sblc-field"><label for="sblc-excluded-domains">Excluded domains (one per line)</label><textarea class="sblc-input" id="sblc-excluded-domains" name="excluded_domains" rows="3">' + escapeHtml((settings.excluded_domains || []).join('\n')) + '</textarea></div><div class="sblc-field"><label for="sblc-excluded-fragments">Excluded URL fragments (one per line)</label><textarea class="sblc-input" id="sblc-excluded-fragments" name="excluded_url_fragments" rows="3">' + escapeHtml((settings.excluded_url_fragments || []).join('\n')) + '</textarea></div><div class="sblc-field"><label for="sblc-schedule">Scheduled scans</label><select class="sblc-select" id="sblc-schedule" name="schedule"><option value="manual"' + ('manual' === settings.schedule ? ' selected' : '') + '>Manual only</option><option value="daily"' + ('daily' === settings.schedule ? ' selected' : '') + '>Daily</option><option value="weekly"' + ('weekly' === settings.schedule ? ' selected' : '') + '>Weekly</option></select><p class="sblc-help">Scheduled work starts a bounded scan from WP-Cron. Manual scanning remains available if cron is delayed.</p></div><label class="sblc-check"><input type="checkbox" name="email_notifications"' + (settings.email_notifications ? ' checked' : '') + ' /> <span>Email a local summary when a scan completes</span></label><div class="sblc-field"><label for="sblc-email">Notification email</label><input class="sblc-input" id="sblc-email" name="notification_email" type="email" value="' + escapeHtml(settings.notification_email || '') + '" /></div><label class="sblc-check"><input type="checkbox" name="delete_data_on_uninstall"' + (settings.delete_data_on_uninstall ? ' checked' : '') + ' /> <span>Delete findings when the plugin is uninstalled</span></label></div></div><div class="sblc-actions">' + button(t('Save settings'), 'save-settings', 'sblc-button-primary') + '</div></form></section>');
+	}
+
+	function renderDrawer(data) {
+		var resource = data || {};
+		var history = (resource.request_history || []).map(function (item) { return '<li><code>' + escapeHtml(item.method) + '</code><span>' + escapeHtml(item.status || item.message || '—') + '</span><span>' + escapeHtml(item.duration || 0) + 's</span></li>'; }).join('');
+		var redirects = (resource.redirect_chain || []).map(function (item) { return '<li><span>' + escapeHtml(item.status) + '</span><span>' + escapeHtml(item.from) + '</span><span>→ ' + escapeHtml(item.to) + '</span></li>'; }).join('');
+		var occurrences = (resource.occurrences || []).map(function (item) {
+			var form = item.editable ? translateMarkup('<div class="sblc-repair-form"><label for="sblc-new-url-' + escapeHtml(item.id) + '">Replacement URL</label><input class="sblc-input" id="sblc-new-url-' + escapeHtml(item.id) + '" type="url" value="' + escapeHtml(resource.final_url && resource.status === 'redirect' ? resource.final_url : '') + '" data-repair-url="' + escapeHtml(item.id) + '" /><div class="sblc-actions"><button type="button" class="sblc-button sblc-button-primary" data-action="apply-repair" data-occurrence-id="' + escapeHtml(item.id) + '" data-operation="replace">Replace URL</button><button type="button" class="sblc-button sblc-button-secondary" data-action="apply-repair" data-occurrence-id="' + escapeHtml(item.id) + '" data-operation="nofollow">Add nofollow</button><button type="button" class="sblc-button sblc-button-secondary" data-action="apply-repair" data-occurrence-id="' + escapeHtml(item.id) + '" data-operation="unlink">Unlink</button></div></div>') : translateMarkup('<p><strong>Read-only source.</strong> This source can be reviewed but is not automatically edited.</p>');
+			return translateMarkup('<article class="sblc-occurrence"><strong>' + escapeHtml(item.source_title || t('Untitled source')) + '</strong><p>' + escapeHtml(item.source_type) + ' · ' + escapeHtml(item.source_field) + ' · ' + escapeHtml(item.location) + '</p><p><a href="' + escapeHtml(item.source_url) + '" target="_blank" rel="noopener noreferrer">Open source</a></p><p>' + escapeHtml(item.context || item.anchor_text || '') + '</p>' + form + '</article>');
+		}).join('');
+		var repairs = (resource.repairs || []).map(function (item) {
+			return translateMarkup('<li><span>' + escapeHtml(displayStatus(item.operation)) + ' · ' + escapeHtml(item.source_type) + ' · ' + escapeHtml(item.created_at) + '</span>' + (Number(item.undone) ? '<span class="sblc-subline">Undone</span>' : '<button type="button" class="sblc-icon-button" data-action="undo-repair" data-repair-id="' + escapeHtml(item.id) + '">Undo</button>') + (item.undo_error ? '<span class="sblc-subline">' + escapeHtml(item.undo_error) + '</span>' : '') + '</li>');
+		}).join('');
+		var drawer = document.createElement('div');
+		drawer.className = 'sblc-drawer-backdrop';
+		drawer.setAttribute('role', 'presentation');
+		drawer.innerHTML = translateMarkup('<aside class="sblc-drawer" role="dialog" aria-modal="true" aria-labelledby="sblc-drawer-title"><div class="sblc-drawer-header"><h2 id="sblc-drawer-title">' + escapeHtml(resource.url) + '</h2><button type="button" class="sblc-close" data-action="close-drawer" aria-label="Close evidence">×</button></div><div class="sblc-drawer-body"><div class="sblc-actions">' + button(t('Recheck'), 'drawer-resource-action', 'sblc-button-secondary', ' data-resource-id="' + escapeHtml(resource.id) + '" data-resource-action="recheck"') + (resource.status === 'ignored' ? button(t('Restore'), 'drawer-resource-action', 'sblc-button-secondary', ' data-resource-id="' + escapeHtml(resource.id) + '" data-resource-action="restore"') : button(t('Ignore'), 'drawer-resource-action', 'sblc-button-secondary', ' data-resource-id="' + escapeHtml(resource.id) + '" data-resource-action="ignore"')) + button(t('Mark manually verified'), 'drawer-resource-action', 'sblc-button-secondary', ' data-resource-id="' + escapeHtml(resource.id) + '" data-resource-action="manual_verify"') + '</div><dl class="sblc-detail-grid"><dt>Classification</dt><dd><span class="sblc-status sblc-status-' + escapeHtml(resource.status) + '">' + escapeHtml(displayStatus(resource.status)) + '</span></dd><dt>Confidence</dt><dd>' + escapeHtml(resource.confidence) + '</dd><dt>HTTP result</dt><dd>' + escapeHtml(resource.http_code || '—') + ' ' + escapeHtml(resource.status_text || '') + '</dd><dt>Final URL</dt><dd>' + escapeHtml(resource.final_url || resource.url) + '</dd><dt>Response time</dt><dd>' + escapeHtml(resource.response_time || 0) + 's</dd><dt>Last checked</dt><dd>' + escapeHtml(resource.last_checked || t('Not checked')) + '</dd><dt>Explanation</dt><dd>' + escapeHtml(resource.explanation || '') + '</dd></dl><section class="sblc-evidence-section"><h3>Request history</h3><ul class="sblc-history">' + (history || '<li>No request history.</li>') + '</ul></section>' + (redirects ? '<section class="sblc-evidence-section"><h3>Redirect chain</h3><ul class="sblc-history">' + redirects + '</ul></section>' : '') + '<section class="sblc-evidence-section"><h3>' + escapeHtml(t('Source locations')) + ' (' + escapeHtml((resource.occurrences || []).length) + ')</h3>' + (occurrences || '<p>No source locations remain in the current scan.</p>') + '</section>' + (repairs ? '<section class="sblc-evidence-section"><h3>Repair history</h3><ul class="sblc-history">' + repairs + '</ul></section>' : '') + '</div></aside>');
+		root.appendChild(drawer);
+		var close = drawer.querySelector('[data-action="close-drawer"]');
+		if (close) { close.focus(); }
+	}
+
+	function refresh() {
+		if (state.screen === 'settings') {
+			root.querySelector('[data-screen-content]').innerHTML = '<div class="sblc-loading">' + escapeHtml(t('Loading settings…')) + '</div>';
+			return api('/settings').then(renderSettings).catch(function (error) { notice(error.message, 'error'); });
+		}
+		if (!root.querySelector('[data-screen-content] .sblc-toolbar')) {
+			root.querySelector('[data-screen-content]').innerHTML = '<div class="sblc-loading">' + escapeHtml(t('Loading findings…')) + '</div>';
+		}
+		var query = '?page=' + state.page + '&per_page=' + state.perPage + '&status=' + encodeURIComponent(state.status) + '&type=' + encodeURIComponent(state.type) + '&scope=' + encodeURIComponent(state.scope) + '&search=' + encodeURIComponent(state.search);
+		return Promise.all([api('/dashboard'), api('/resources' + query)]).then(function (responses) {
+			var dashboard = responses[0];
+			dashboard.list = responses[1];
+			state.lastProgress = dashboard.progress;
+			renderFindings(dashboard);
+		}).catch(function (error) { notice(error.message, 'error'); });
+	}
+
+	function scheduleMonitor(scanId, delay, retryCount) {
+		window.clearTimeout(state.monitorTimer);
+		state.monitorTimer = window.setTimeout(function () {
+			state.monitorTimer = null;
+			monitor(scanId, retryCount);
+		}, delay);
+	}
+
+	function monitor(scanId, retryCount) {
+		if (state.monitoring || !scanId) { return; }
+		retryCount = Number(retryCount) || 0;
+		state.monitoring = true;
+		post('/scan/step', { scan_id: scanId }).then(function (progress) {
+			state.lastProgress = progress;
+			return refresh().then(function () {
+				state.monitoring = false;
+				var latest = state.lastProgress || progress;
+				if (latest.state === 'discovering' || latest.state === 'checking' || latest.state === 'cancelling') {
+					scheduleMonitor(latest.scan_id, 800, 0);
+				}
+			});
+		}).catch(function (error) {
+			state.monitoring = false;
+			notice(error.message, 'error');
+			var current = state.lastProgress;
+			if (current && Number(current.scan_id) === Number(scanId) && ['discovering', 'checking', 'cancelling'].indexOf(current.state) !== -1) {
+				/* Retry transient REST/network failures while the server-side scan remains active. */
+				scheduleMonitor(scanId, Math.min(10000, 1000 * Math.pow(2, Math.min(retryCount, 3))), retryCount + 1);
+			}
+		});
+	}
+
+	function selectedIds() {
+		return Array.prototype.slice.call(root.querySelectorAll('[data-resource-check]:checked')).map(function (input) { return Number(input.value); });
+	}
+
+	root.addEventListener('click', function (event) {
+		var target = event.target.closest('[data-action]');
+		if (!target) { return; }
+		var action = target.getAttribute('data-action');
+		if (action === 'filter-status') {
+			state.status = target.getAttribute('data-status') || 'all'; state.page = 1; refresh(); return;
+		}
+		if (action === 'open-resource') {
+			api('/resource/' + encodeURIComponent(target.getAttribute('data-resource-id'))).then(renderDrawer).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'close-drawer') { var backdrop = target.closest('.sblc-drawer-backdrop'); if (backdrop) { backdrop.remove(); } return; }
+		if (action === 'start-scan') {
+			window.clearTimeout(state.monitorTimer);
+			state.monitorTimer = null;
+			post('/scan/start', {}).then(function (progress) { notice(t('Scan started. Discovery and verification will run in small bounded requests.'), 'success'); state.lastProgress = progress; state.monitoring = true; renderFindings({ progress: progress, counts: progress.counts || {}, list: { items: [], total: 0 } }); state.monitoring = false; monitor(progress.scan_id); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'cancel-scan') {
+			if (!window.confirm(t('Stop the current scan after its active bounded request?'))) { return; }
+			window.clearTimeout(state.monitorTimer);
+			state.monitorTimer = null;
+			post('/scan/cancel', { scan_id: Number(target.getAttribute('data-scan-id')) }).then(function (progress) { state.lastProgress = progress; state.monitoring = false; refresh(); }).catch(function (error) { state.monitoring = false; notice(error.message, 'error'); }); return;
+		}
+		if (action === 'page-prev' && state.page > 1) { state.page -= 1; refresh(); return; }
+		if (action === 'page-next') { state.page += 1; refresh(); return; }
+		if (action === 'export-findings') { window.location.href = config.exportUrl; return; }
+		if (action === 'bulk-action') {
+			var select = root.querySelector('[data-bulk-select]'); var ids = selectedIds();
+			if (!select || !select.value || !ids.length) { notice(t('Select resources and a bulk action first.'), 'error'); return; }
+			post('/resources/bulk', { ids: ids, action: select.value }).then(function (result) { notice(result.message || t('Resources updated.'), 'success'); refresh(); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'resource-action' || action === 'drawer-resource-action') {
+			post('/resource/' + encodeURIComponent(target.getAttribute('data-resource-id')) + '/action', { action: target.getAttribute('data-resource-action') }).then(function (result) { notice(t('Resource updated.'), 'success'); var drawer = root.querySelector('.sblc-drawer-backdrop'); if (drawer) { drawer.remove(); } refresh(); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'undo-repair') {
+			if (!window.confirm(t('Restore the source content saved before this repair?'))) { return; }
+			post('/repair/' + encodeURIComponent(target.getAttribute('data-repair-id')) + '/undo', {}).then(function (result) { notice(result.message || t('Repair undone.'), 'success'); var drawer = root.querySelector('.sblc-drawer-backdrop'); if (drawer) { drawer.remove(); } refresh(); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'apply-repair') {
+			var occurrenceId = target.getAttribute('data-occurrence-id'); var input = root.querySelector('[data-repair-url="' + occurrenceId + '"]'); var operation = target.getAttribute('data-operation');
+			if (operation === 'unlink' && !window.confirm(t('Unlink this occurrence while preserving its visible text?'))) { return; }
+			if (operation !== 'unlink' && !window.confirm(t('This will change stored WordPress content and create an undo record. Continue?'))) { return; }
+			post('/repair', { occurrence_id: Number(occurrenceId), operation: operation, new_url: input ? input.value : '' }).then(function (result) { notice(result.message || t('Source updated.'), 'success'); var drawer = root.querySelector('.sblc-drawer-backdrop'); if (drawer) { drawer.remove(); } refresh(); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+		if (action === 'save-settings') {
+			event.preventDefault(); var form = root.querySelector('[data-settings-form]'); var formData = new FormData(form); var payload = {};
+			formData.forEach(function (value, key) { if (key.slice(-2) === '[]') { var clean = key.slice(0, -2); payload[clean] = payload[clean] || []; payload[clean].push(value); } else { payload[key] = value; } });
+			['include_comments','include_menus','include_featured_images','include_custom_fields','check_internal_links','check_external_links','email_notifications','delete_data_on_uninstall'].forEach(function (key) { payload[key] = form.querySelector('[name="' + key + '"]').checked; });
+			['custom_meta_keys','excluded_domains','excluded_url_fragments'].forEach(function (key) { payload[key] = String(payload[key] || '').split(/\r?\n/).map(function (value) { return value.trim(); }).filter(Boolean); });
+			post('/settings', payload).then(function () { notice(t('Settings saved.'), 'success'); }).catch(function (error) { notice(error.message, 'error'); }); return;
+		}
+	});
+
+	root.addEventListener('input', function (event) {
+		if (!event.target.hasAttribute('data-search-field')) { return; }
+		window.clearTimeout(state.searchTimer);
+		state.searchTimer = window.setTimeout(function () { state.search = event.target.value || ''; state.page = 1; refresh(); }, 350);
+	});
+	root.addEventListener('change', function (event) {
+		if (event.target.hasAttribute('data-type-field')) { state.type = event.target.value; state.page = 1; refresh(); }
+		if (event.target.hasAttribute('data-scope-field')) { state.scope = event.target.value; state.page = 1; refresh(); }
+		if (event.target.hasAttribute('data-select-all')) { root.querySelectorAll('[data-resource-check]').forEach(function (input) { input.checked = event.target.checked; }); }
+	});
+
+	refresh();
+}(window, document));
