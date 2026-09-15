@@ -21,6 +21,111 @@ final class Http_Checker {
 	 * @return array
 	 */
 	public static function check( $url, $retry_count = 0 ) {
+		return self::check_with_initial( $url, $retry_count, null );
+	}
+
+	/**
+	 * Check several resources with bounded parallel HEAD requests.
+	 *
+	 * The first request for each URL is dispatched together through the
+	 * WordPress-bundled Requests transport. Redirect hops and selective GET
+	 * fallbacks remain per-URL and are handled by the same evidence engine as
+	 * single checks. Older WordPress transports fall back to sequential checks.
+	 *
+	 * @param array $resources Resource objects or URL strings.
+	 * @return array Results keyed by resource ID or input index.
+	 */
+	public static function check_many( $resources ) {
+		$entries = array();
+		foreach ( (array) $resources as $key => $resource ) {
+			$url   = is_object( $resource ) && isset( $resource->url ) ? (string) $resource->url : (string) $resource;
+			$retry = is_object( $resource ) && isset( $resource->retry_count ) ? absint( $resource->retry_count ) : 0;
+			if ( '' === $url ) {
+				continue;
+			}
+			$entries[ $key ] = array(
+				'url'   => $url,
+				'retry' => $retry,
+			);
+		}
+		if ( empty( $entries ) ) {
+			return array();
+		}
+
+		/* Requests::request_multiple() is available in the supported WP 6.2+ range. */
+		if ( ! class_exists( '\\WpOrg\\Requests\\Requests' ) || ! class_exists( '\\WP_HTTP_Requests_Hooks' ) ) {
+			$results = array();
+			foreach ( $entries as $key => $entry ) {
+				$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+			}
+			return $results;
+		}
+
+		$settings      = Settings::all();
+		$results       = array();
+		$requests      = array();
+		$starts        = array();
+		$timings       = array();
+		$batch_started = microtime( true );
+		$complete      = static function ( $response, $id ) use ( &$timings, &$starts ) {
+			$timings[ $id ] = isset( $starts[ $id ] ) ? microtime( true ) - $starts[ $id ] : 0.0;
+		};
+
+		foreach ( $entries as $key => $entry ) {
+			$safety = Ssrf_Guard::validate( $entry['url'] );
+			if ( empty( $safety['safe'] ) ) {
+				/* Preserve the single-check safety classification without a network call. */
+				$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+				continue;
+			}
+			$args             = self::request_args( $entry['url'], 'HEAD', $settings );
+			$starts[ $key ]   = $batch_started;
+			$requests[ $key ] = array(
+				'url'     => $entry['url'],
+				'headers' => $args['headers'],
+				'data'    => '',
+				'type'    => 'HEAD',
+				'options' => self::requests_options( $entry['url'], $args, $complete ),
+			);
+		}
+
+		if ( empty( $requests ) ) {
+			return $results;
+		}
+
+		try {
+			$responses = \WpOrg\Requests\Requests::request_multiple( $requests );
+		} catch ( \Throwable $error ) {
+			/* A host transport or third-party hook may reject multiplexing; never lose a check. */
+			foreach ( $entries as $key => $entry ) {
+				if ( ! isset( $results[ $key ] ) ) {
+					$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+				}
+			}
+			return $results;
+		}
+
+		foreach ( $requests as $key => $request ) {
+			if ( ! array_key_exists( $key, $responses ) ) {
+				$results[ $key ] = self::check( $entries[ $key ]['url'], $entries[ $key ]['retry'] );
+				continue;
+			}
+			$duration        = isset( $timings[ $key ] ) ? $timings[ $key ] : microtime( true ) - $batch_started;
+			$initial         = self::parallel_response( $responses[ $key ], $duration );
+			$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], $initial );
+		}
+		return $results;
+	}
+
+	/**
+	 * Check one URL, optionally reusing a parallel HEAD response.
+	 *
+	 * @param string     $url              URL.
+	 * @param int        $retry_count      Previous retry count.
+	 * @param array|null $initial_response Initial HEAD response.
+	 * @return array
+	 */
+	private static function check_with_initial( $url, $retry_count, $initial_response ) {
 		$settings    = Settings::all();
 		$max_retries = absint( $settings['max_retries'] );
 		$safety      = Ssrf_Guard::validate( $url );
@@ -40,18 +145,24 @@ final class Http_Checker {
 		$max_redirects  = absint( $settings['max_redirects'] );
 		$final_response = null;
 
+		$first_request = true;
 		while ( true ) {
-			$head        = self::request( $current, 'HEAD', $settings );
-			$total_time += (float) $head['duration'];
-			$history[]   = self::history_item( 'HEAD', $current, $head );
-			$response    = $head;
+			if ( $first_request && is_array( $initial_response ) ) {
+				$head = $initial_response;
+			} else {
+				$head = self::request( $current, 'HEAD', $settings );
+			}
+			$first_request = false;
+			$total_time   += (float) $head['duration'];
+			$history[]     = self::history_item( 'HEAD', $current, $head );
+			$response      = $head;
 
 			/*
-			 * HEAD is only an optimization. Many otherwise healthy sites block it,
-			 * close it without a response, or return an error page only for HEAD.
-			 * Confirm every non-successful HEAD result with a small bounded GET.
+			 * HEAD is only an optimization. Retry with GET when it is inconclusive,
+			 * unsupported, or returns a server error. Definitive 404/410 responses
+			 * do not need a second request and this keeps large scans practical.
 			 */
-			if ( $head['error'] || $head['code'] < 200 || $head['code'] >= 400 ) {
+			if ( $head['error'] || 0 === (int) $head['code'] || in_array( (int) $head['code'], array( 405, 406 ), true ) || ( $head['code'] >= 500 && $head['code'] <= 599 ) ) {
 				$get         = self::request( $current, 'GET', $settings );
 				$total_time += (float) $get['duration'];
 				$history[]   = self::history_item( 'GET', $current, $get );
@@ -136,24 +247,9 @@ final class Http_Checker {
 	 */
 	private static function request( $url, $method, $settings ) {
 		$start = microtime( true );
-		$args  = array(
-			'method'              => $method,
-			'timeout'             => absint( $settings['timeout'] ),
-			'connect_timeout'     => absint( $settings['timeout'] ),
-			'redirection'         => 0,
-			'limit_response_size' => absint( $settings['max_body_bytes'] ),
-			'sslverify'           => true,
-			'user-agent'          => 'Mozilla/5.0 (compatible; Simple Broken Link Checker/' . SBLC_VERSION . '; +' . home_url( '/' ) . ')',
-			'headers'             => array(
-				'Accept'     => '*/*',
-				'Connection' => 'close',
-			),
-		);
-		if ( 'GET' === $method ) {
-			$args['headers']['Range'] = 'bytes=0-' . max( 0, absint( $settings['max_body_bytes'] ) - 1 );
-		}
-		$home = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
-		$host = wp_parse_url( $url, PHP_URL_HOST );
+		$args  = self::request_args( $url, $method, $settings );
+		$home  = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+		$host  = wp_parse_url( $url, PHP_URL_HOST );
 		if ( $home && $host && strtolower( $home ) === strtolower( $host ) ) {
 			$response = wp_remote_request( $url, $args );
 		} else {
@@ -177,6 +273,104 @@ final class Http_Checker {
 			'error'      => false,
 			'error_code' => '',
 			'duration'   => $duration,
+		);
+	}
+
+	/**
+	 * Build the common WordPress HTTP arguments for a bounded request.
+	 *
+	 * @param string $url      URL.
+	 * @param string $method   HEAD or GET.
+	 * @param array  $settings Settings.
+	 * @return array
+	 */
+	private static function request_args( $url, $method, $settings ) {
+		$args = array(
+			'method'              => $method,
+			'timeout'             => absint( $settings['timeout'] ),
+			'connect_timeout'     => absint( $settings['timeout'] ),
+			'redirection'         => 0,
+			'limit_response_size' => absint( $settings['max_body_bytes'] ),
+			'sslverify'           => true,
+			'sslcertificates'     => ABSPATH . WPINC . '/certificates/ca-bundle.crt',
+			'reject_unsafe_urls'  => true,
+			'blocking'            => true,
+			'body'                => '',
+			'user-agent'          => 'Mozilla/5.0 (compatible; Simple Broken Link Checker/' . SBLC_VERSION . '; +' . home_url( '/' ) . ')',
+			'headers'             => array(
+				'Accept'     => '*/*',
+				'Connection' => 'close',
+			),
+		);
+		if ( 'GET' === $method ) {
+			$args['headers']['Range'] = 'bytes=0-' . max( 0, absint( $settings['max_body_bytes'] ) - 1 );
+		}
+		return apply_filters( 'http_request_args', $args, $url );
+	}
+
+	/**
+	 * Translate WordPress HTTP arguments into Requests options.
+	 *
+	 * @param string   $url      URL.
+	 * @param array    $args     WordPress HTTP arguments.
+	 * @param callable $complete Completion callback.
+	 * @return array
+	 */
+	private static function requests_options( $url, $args, $complete ) {
+		$options           = array(
+			'timeout'          => (float) $args['timeout'],
+			'connect_timeout'  => (float) $args['connect_timeout'],
+			'useragent'        => (string) $args['user-agent'],
+			'blocking'         => true,
+			'follow_redirects' => false,
+			'redirects'        => 0,
+			'max_bytes'        => absint( $args['limit_response_size'] ),
+			'verify'           => ! empty( $args['sslverify'] ) ? $args['sslcertificates'] : false,
+			'verifyname'       => ! empty( $args['sslverify'] ),
+			'hooks'            => new \WP_HTTP_Requests_Hooks( $url, $args ),
+			'complete'         => $complete,
+		);
+		$options['verify'] = apply_filters( 'https_ssl_verify', $options['verify'], $url );
+		$proxy             = new \WP_HTTP_Proxy();
+		if ( $proxy->is_enabled() && $proxy->send_through_proxy( $url ) ) {
+			$options['proxy'] = new \WpOrg\Requests\Proxy\Http( $proxy->host() . ':' . $proxy->port() );
+			if ( $proxy->use_authentication() ) {
+				$options['proxy']->use_authentication = true;
+				$options['proxy']->user               = $proxy->username();
+				$options['proxy']->pass               = $proxy->password();
+			}
+		}
+		return $options;
+	}
+
+	/**
+	 * Convert one Requests response into the internal response shape.
+	 *
+	 * @param mixed $response Response or exception.
+	 * @param float $duration Elapsed request time.
+	 * @return array
+	 */
+	private static function parallel_response( $response, $duration ) {
+		if ( $response instanceof \WpOrg\Requests\Response ) {
+			$wp_response = new \WP_HTTP_Requests_Response( $response );
+			$array       = $wp_response->to_array();
+			return array(
+				'response'   => $array,
+				'code'       => (int) $response->status_code,
+				'message'    => sanitize_text_field( get_status_header_desc( (int) $response->status_code ) ),
+				'error'      => false,
+				'error_code' => '',
+				'duration'   => (float) $duration,
+			);
+		}
+		$message = is_object( $response ) && method_exists( $response, 'getMessage' ) ? $response->getMessage() : __( 'The parallel request failed.', 'simple-broken-link-checker' );
+		return array(
+			'response'   => array(),
+			'code'       => 0,
+			'message'    => sanitize_text_field( $message ),
+			'error'      => true,
+			'error_code' => 'http_request_failed',
+			'duration'   => (float) $duration,
 		);
 	}
 

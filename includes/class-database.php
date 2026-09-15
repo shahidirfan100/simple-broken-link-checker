@@ -74,9 +74,9 @@ final class Database {
 				if ( ! empty( $existing->ignored ) ) {
 					/* Ignored resources remain ignored, but are counted as checked. */
 					$data['checked_scan_id'] = absint( $scan_id );
-					$formats[]              = '%d';
+					$formats[]               = '%d';
 				} else {
-					$data = array_merge(
+					$data    = array_merge(
 						$data,
 						array(
 							'status'          => 'pending',
@@ -344,6 +344,98 @@ final class Database {
 		$tables = self::tables();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Plugin-owned mutable tables require direct, uncached access.
 		return $wpdb->get_row( $wpdb->prepare( 'SELECT r.*, COUNT(o.id) AS occurrence_count FROM %i r LEFT JOIN %i o ON o.resource_id = r.id WHERE r.id = %d GROUP BY r.id LIMIT 1', $tables['resources'], $tables['occurrences'], absint( $resource_id ) ) );
+	}
+
+	/**
+	 * Update one occurrence after a source repair.
+	 *
+	 * @param int   $occurrence_id Occurrence ID.
+	 * @param array $data          Allowed occurrence fields.
+	 * @return bool
+	 */
+	public static function update_occurrence( $occurrence_id, $data ) {
+		global $wpdb;
+		$allowed = array( 'resource_id', 'raw_url', 'anchor_text', 'context', 'location' );
+		$data    = array_intersect_key( $data, array_flip( $allowed ) );
+		if ( empty( $data ) ) {
+			return false;
+		}
+		$formats = array();
+		foreach ( $data as $key => $value ) {
+			if ( 'resource_id' === $key ) {
+				$data[ $key ] = absint( $value );
+				$formats[]    = '%d';
+			} elseif ( 'raw_url' === $key ) {
+				$data[ $key ] = sanitize_text_field( $value );
+				$formats[]    = '%s';
+			} else {
+				$data[ $key ] = 'anchor_text' === $key ? wp_strip_all_tags( $value ) : sanitize_textarea_field( $value );
+				$formats[]    = '%s';
+			}
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Plugin-owned occurrence metadata must be updated with direct access.
+		return false !== $wpdb->update( self::tables()['occurrences'], $data, array( 'id' => absint( $occurrence_id ) ), $formats, array( '%d' ) );
+	}
+
+	/**
+	 * Hide a resource that no longer has source occurrences.
+	 *
+	 * Historical resource evidence remains stored for audit and undo, while
+	 * current dashboard counts omit the orphaned URL.
+	 *
+	 * @param int $resource_id Resource ID.
+	 * @return bool
+	 */
+	public static function retire_resource_if_orphaned( $resource_id ) {
+		global $wpdb;
+		$tables = self::tables();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Orphan checks must read current occurrence state without cache staleness.
+		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d', $tables['occurrences'], absint( $resource_id ) ) );
+		if ( $count > 0 ) {
+			return true;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Orphaned plugin resource is intentionally hidden from current findings.
+		return false !== $wpdb->update(
+			$tables['resources'],
+			array(
+				'last_scan_id'    => 0,
+				'checked_scan_id' => 0,
+			),
+			array( 'id' => absint( $resource_id ) ),
+			array( '%d', '%d' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Restore a resource to a scan queue after an undo.
+	 *
+	 * @param int $resource_id Resource ID.
+	 * @param int $scan_id     Scan ID.
+	 * @return bool
+	 */
+	public static function restore_resource_for_scan( $resource_id, $scan_id ) {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Undo must restore the plugin-owned resource to the source scan.
+		return false !== $wpdb->update(
+			self::tables()['resources'],
+			array(
+				'last_scan_id'    => absint( $scan_id ),
+				'checked_scan_id' => 0,
+				'ignored'         => 0,
+				'manual_verified' => 0,
+				'status'          => 'unverified',
+				'confidence'      => 'unverified',
+				'status_text'     => __( 'Recheck needed', 'simple-broken-link-checker' ),
+				'explanation'     => __( 'The source was restored. Recheck this resource to collect fresh evidence.', 'simple-broken-link-checker' ),
+				'last_checked'    => null,
+				'next_check_at'   => null,
+				'retry_count'     => 0,
+			),
+			array( 'id' => absint( $resource_id ) ),
+			array( '%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d' ),
+			array( '%d' )
+		);
 	}
 
 	/**

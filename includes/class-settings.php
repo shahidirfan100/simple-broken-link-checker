@@ -23,6 +23,7 @@ final class Settings {
 	public static function defaults() {
 		return array(
 			'batch_size'               => 5,
+			'parallel_requests'        => 4,
 			'execution_seconds'        => 8,
 			'timeout'                  => 12,
 			'max_redirects'            => 8,
@@ -101,7 +102,7 @@ final class Settings {
 		$defaults = self::defaults();
 		$output   = self::all();
 
-		$integer_keys = array( 'batch_size', 'execution_seconds', 'timeout', 'max_redirects', 'max_retries', 'max_body_bytes' );
+		$integer_keys = array( 'batch_size', 'parallel_requests', 'execution_seconds', 'timeout', 'max_redirects', 'max_retries', 'max_body_bytes' );
 		foreach ( $integer_keys as $key ) {
 			if ( array_key_exists( $key, $input ) ) {
 				$output[ $key ] = absint( $input[ $key ] );
@@ -109,6 +110,7 @@ final class Settings {
 		}
 
 		$output['batch_size']        = min( 25, max( 1, (int) $output['batch_size'] ) );
+		$output['parallel_requests'] = min( 8, max( 1, (int) $output['parallel_requests'] ) );
 		$output['execution_seconds'] = min( 20, max( 3, (int) $output['execution_seconds'] ) );
 		$output['timeout']           = min( 60, max( 3, (int) $output['timeout'] ) );
 		$output['max_redirects']     = min( 15, max( 0, (int) $output['max_redirects'] ) );

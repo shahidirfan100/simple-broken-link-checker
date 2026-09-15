@@ -2,7 +2,7 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Simple Broken Link Checker 1.0.5\n"
+"Project-Id-Version: Simple Broken Link Checker 1.0.6\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/simple-broken-link-checker\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"

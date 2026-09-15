@@ -16,7 +16,7 @@ The scanner distinguishes successful responses, redirects, definitive 404/410 fa
 
 ## Development notes
 
-The plugin uses WordPress HTTP APIs with redirect following disabled. Each redirect target is normalized and validated before the next request. Requests are limited by timeout, redirect count, response size, and a recoverable worker lock. The admin application uses plain JavaScript and scoped CSS loaded only on plugin screens.
+The plugin uses WordPress HTTP APIs with redirect following disabled. Each redirect target is normalized and validated before the next request. Requests are limited by timeout, redirect count, response size, and a recoverable worker lock. URL verification runs in bounded parallel groups (configurable from one to eight requests), while source discovery waits for each discovered group to finish. Definitive 404/410 responses are not retried with a redundant GET. Replacement repairs are verified before the old orphaned finding is retired, and undo restores the original resource mapping. The admin application uses plain JavaScript and scoped CSS loaded only on plugin screens.
 
 ## License
 

@@ -4,7 +4,7 @@ Tags: broken links, link checker, broken images, redirects, local scanner
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -99,6 +99,12 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 6. Active bounded scan with visible progress and a safe stop control.
 
 == Changelog ==
+
+= 1.0.6 =
+* Added bounded parallel URL verification with a configurable 1–8 request limit to reduce scan time on large sites.
+* Avoided redundant GET requests for definitive 404 and 410 responses while retaining GET fallback for inconclusive HEAD responses.
+* Reindexed replacement URLs immediately, verified them before returning success, and retired orphaned old findings.
+* Restored the original occurrence/resource mapping on undo and kept replacement and unlink operations auditable.
 
 = 1.0.5 =
 * Serialized discovery and verification so each discovered batch is classified before more source URLs are fetched.

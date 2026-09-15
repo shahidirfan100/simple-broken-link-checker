@@ -80,7 +80,7 @@ final class Scanner {
 					self::check_resources( $scan, $deadline );
 				}
 			}
-			$scan = Database::get_scan( $scan_id );
+			$scan    = Database::get_scan( $scan_id );
 			$pending = $scan ? Database::resources_for_scan( $scan->id, 1 ) : array();
 			if ( $scan && ( 'checking' === $scan->state || ( 'discovering' === $scan->state && ! empty( $pending ) ) ) && microtime( true ) < $deadline ) {
 				self::check_resources( $scan, $deadline );
@@ -253,17 +253,29 @@ final class Scanner {
 	 */
 	private static function check_resources( $scan, $deadline ) {
 		$resources = Database::resources_for_scan( $scan->id, absint( Settings::get( 'batch_size', 5 ) ) );
-		foreach ( $resources as $resource ) {
+		$parallel  = min( 8, max( 1, absint( Settings::get( 'parallel_requests', 4 ) ) ) );
+		$chunks    = array_chunk( $resources, $parallel );
+		foreach ( $chunks as $chunk ) {
 			if ( microtime( true ) >= $deadline ) {
 				break;
 			}
-			if ( ! empty( $resource->ignored ) ) {
-				Database::mark_checked( $resource->id, $scan->id );
-				continue;
+			$active  = array();
+			$results = array();
+			foreach ( $chunk as $resource ) {
+				if ( ! empty( $resource->ignored ) ) {
+					Database::mark_checked( $resource->id, $scan->id );
+					continue;
+				}
+				$active[ $resource->id ] = $resource;
 			}
-			/* A user-started or scheduled scan is a fresh verification pass. */
-			$result = Http_Checker::check( $resource->url, absint( $resource->retry_count ) );
-			Database::save_result( $resource->id, $scan->id, $result );
+			if ( ! empty( $active ) ) {
+				/* A user-started or scheduled scan is a fresh verification pass. */
+				$results = Http_Checker::check_many( $active );
+			}
+			foreach ( $active as $resource_id => $resource ) {
+				$result = isset( $results[ $resource_id ] ) ? $results[ $resource_id ] : Http_Checker::check( $resource->url, absint( $resource->retry_count ) );
+				Database::save_result( $resource_id, $scan->id, $result );
+			}
 		}
 		$stats = Database::scan_stats( $scan->id );
 		Database::update_scan( $scan->id, array( 'checked_resources' => $stats['checked_resources'] ) );
@@ -290,8 +302,8 @@ final class Scanner {
 				),
 			);
 		}
-		$stats   = Database::scan_stats( $scan->id );
-		$phase   = 'discovering' === $scan->state ? 'discovery' : ( 'checking' === $scan->state ? 'verification' : $scan->state );
+		$stats = Database::scan_stats( $scan->id );
+		$phase = 'discovering' === $scan->state ? 'discovery' : ( 'checking' === $scan->state ? 'verification' : $scan->state );
 		if ( 'discovering' === $scan->state && $stats['checked_resources'] < $stats['total_resources'] ) {
 			$phase = 'verification';
 		}

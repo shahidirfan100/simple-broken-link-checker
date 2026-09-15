@@ -42,12 +42,35 @@ final class Repair {
 		if ( null === $before ) {
 			return new \WP_Error( 'sblc_source_missing', __( 'The source content could not be loaded.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
 		}
-		$target      = $resource ? $resource->url : $occurrence->raw_url;
-		$replacement = '';
+		$target          = $resource ? $resource->url : $occurrence->raw_url;
+		$old_resource_id = absint( $occurrence->resource_id );
+		$scan_id         = absint( $occurrence->scan_id );
+		if ( ! $scan_id && $resource ) {
+			$scan_id = absint( $resource->last_scan_id );
+		}
+		$replacement     = '';
+		$new_resource_id = 0;
+		$verification    = null;
 		if ( 'replace' === $operation ) {
 			$replacement = Url::normalize( $new_url, $occurrence->source_url );
 			if ( ! $replacement ) {
 				return new \WP_Error( 'sblc_replacement_invalid', __( 'Enter a valid HTTP or HTTPS replacement URL.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+			}
+			$new_resource_id = Database::upsert_resource( $replacement, $resource ? $resource->resource_type : 'link', $scan_id );
+			if ( ! $new_resource_id ) {
+				return new \WP_Error( 'sblc_replacement_prepare_failed', __( 'The replacement URL could not be prepared for verification. The source was not changed.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			}
+			$verification = Http_Checker::check( $replacement );
+			if ( ! in_array( $verification['status'], array( 'healthy', 'redirect' ), true ) ) {
+				Database::retire_resource_if_orphaned( $new_resource_id );
+				return new \WP_Error(
+					'sblc_replacement_not_verified',
+					__( 'The replacement URL did not return healthy or redirect evidence, so the original source was not changed.', 'simple-broken-link-checker' ),
+					array(
+						'status'      => 422,
+						'sblc_status' => $verification['status'],
+					)
+				);
 			}
 		} elseif ( 'nofollow' === $operation ) {
 			$replacement = $target;
@@ -102,6 +125,9 @@ final class Repair {
 
 		$result = self::save_source( $occurrence, $after );
 		if ( is_wp_error( $result ) || false === $result || 0 === $result ) {
+			if ( $new_resource_id && $new_resource_id !== $old_resource_id ) {
+				Database::retire_resource_if_orphaned( $new_resource_id );
+			}
 			Database::update_repair(
 				$repair_id,
 				array(
@@ -111,8 +137,59 @@ final class Repair {
 			);
 			return new \WP_Error( 'sblc_update_failed', __( 'WordPress could not save the repaired source.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
 		}
+
+		if ( 'replace' === $operation ) {
+			$occurrence_updated = Database::update_occurrence(
+				$occurrence_id,
+				array(
+					'resource_id' => $new_resource_id,
+					'raw_url'     => $replacement,
+				)
+			);
+			if ( ! $occurrence_updated ) {
+				/* Keep source content and the resource index consistent if the mapping fails. */
+				self::save_source( $occurrence, $before );
+				Database::retire_resource_if_orphaned( $new_resource_id );
+				Database::update_repair(
+					$repair_id,
+					array(
+						'undone'     => 1,
+						'undo_error' => __( 'The source was restored because its resource index could not be updated.', 'simple-broken-link-checker' ),
+					)
+				);
+				return new \WP_Error( 'sblc_index_update_failed', __( 'The source was restored because the replacement could not be indexed.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			}
+			Database::update_resource(
+				$new_resource_id,
+				array(
+					'ignored'         => 0,
+					'manual_verified' => 0,
+				)
+			);
+			Database::save_result( $new_resource_id, $scan_id, $verification );
+			if ( $new_resource_id !== $old_resource_id ) {
+				Database::retire_resource_if_orphaned( $old_resource_id );
+			}
+			return array(
+				'repair_id'   => $repair_id,
+				'resource_id' => $new_resource_id,
+				'status'      => $verification['status'],
+				'http_code'   => $verification['http_code'],
+				'message'     => __( 'The source was updated, the replacement was verified, and the old finding was removed when no sources still used it.', 'simple-broken-link-checker' ),
+			);
+		}
+
+		if ( 'unlink' === $operation ) {
+			Database::update_occurrence( $occurrence_id, array( 'resource_id' => 0 ) );
+			Database::retire_resource_if_orphaned( $old_resource_id );
+			return array(
+				'repair_id' => $repair_id,
+				'message'   => __( 'The link was unlinked and removed from the finding when no sources still used it.', 'simple-broken-link-checker' ),
+			);
+		}
+
 		Database::update_resource(
-			$occurrence->resource_id,
+			$old_resource_id,
 			array(
 				'status'          => 'unverified',
 				'confidence'      => 'unverified',
@@ -144,7 +221,8 @@ final class Repair {
 		if ( $repair->undone ) {
 			return new \WP_Error( 'sblc_already_undone', __( 'This repair has already been undone.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
 		}
-		$occurrence = Database::get_occurrence( $repair->occurrence_id );
+		$occurrence        = Database::get_occurrence( $repair->occurrence_id );
+		$stored_occurrence = (bool) $occurrence;
 		if ( ! $occurrence ) {
 			$occurrence = (object) array(
 				'source_type'  => $repair->source_type,
@@ -165,24 +243,52 @@ final class Repair {
 		if ( is_wp_error( $result ) || false === $result || 0 === $result ) {
 			return new \WP_Error( 'sblc_undo_failed', __( 'WordPress could not restore the original source.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
 		}
+
+		/*
+		 * A replacement or unlink changes the occurrence-to-resource mapping as
+		 * well as the source text. Restore that mapping before marking the audit
+		 * record undone so the next scan can verify the original URL again.
+		 */
+		$repair_occurrence_id = absint( $repair->occurrence_id );
+		if ( $stored_occurrence && $repair_occurrence_id ) {
+			$current_resource_id = isset( $occurrence->resource_id ) ? absint( $occurrence->resource_id ) : 0;
+			$old_resource_id     = absint( $repair->resource_id );
+			$old_resource        = Database::get_resource( $old_resource_id );
+			$scan_id             = isset( $occurrence->scan_id ) ? absint( $occurrence->scan_id ) : 0;
+			if ( ! $scan_id && $old_resource ) {
+				$scan_id = absint( $old_resource->last_scan_id );
+			}
+			if ( ! $scan_id ) {
+				$latest  = Database::get_latest_scan();
+				$scan_id = $latest ? absint( $latest->id ) : 0;
+			}
+
+			if ( in_array( $repair->operation, array( 'replace', 'unlink' ), true ) ) {
+				$old_url = $old_resource ? (string) $old_resource->url : (string) $occurrence->raw_url;
+				$mapped  = Database::update_occurrence(
+					$repair_occurrence_id,
+					array(
+						'resource_id' => $old_resource_id,
+						'raw_url'     => $old_url,
+					)
+				);
+				if ( ! $mapped ) {
+					Database::update_repair( $repair_id, array( 'undo_error' => __( 'The source was restored, but its resource index could not be restored. Review the finding before scanning again.', 'simple-broken-link-checker' ) ) );
+					return new \WP_Error( 'sblc_undo_index_failed', __( 'The source was restored, but the finding index could not be restored.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+				}
+				if ( $current_resource_id && $current_resource_id !== $old_resource_id ) {
+					Database::retire_resource_if_orphaned( $current_resource_id );
+				}
+			}
+			if ( $old_resource_id && $scan_id ) {
+				Database::restore_resource_for_scan( $old_resource_id, $scan_id );
+			}
+		}
 		Database::update_repair(
 			$repair_id,
 			array(
 				'undone'     => 1,
 				'undo_error' => '',
-			)
-		);
-		Database::update_resource(
-			$repair->resource_id,
-			array(
-				'status'          => 'unverified',
-				'confidence'      => 'unverified',
-				'status_text'     => __( 'Recheck needed', 'simple-broken-link-checker' ),
-				'explanation'     => __( 'The source was restored. Recheck this resource to collect fresh evidence.', 'simple-broken-link-checker' ),
-				'checked_scan_id' => 0,
-				'last_checked'    => null,
-				'next_check_at'   => null,
-				'retry_count'     => 0,
 			)
 		);
 		return array( 'message' => __( 'The original source was restored.', 'simple-broken-link-checker' ) );
