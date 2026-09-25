@@ -4,7 +4,7 @@ Tags: broken links, link checker, broken images, redirects, local scanner
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.7
+Stable tag: 1.0.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -42,7 +42,7 @@ Supported post content, approved comment content, and custom menu URLs can be re
 
 ### Resource controls
 
-Scanning runs in small resumable worker requests. Each discovered source batch is verified before the next source batch is read, and repeated occurrences do not re-queue a settled URL. Only one worker request processes the scan at a time. HTTP request timeouts are capped to the worker's remaining time budget, and URLs left unchecked stay queued for the next request. The scanner also uses per-resource deduplication, redirect limits, response-size limits, and safe retry scheduling. Manual scanning remains available when WordPress cron is delayed.
+Scanning runs in small resumable worker requests. Each discovered source batch is verified before the next source batch is read, and repeated occurrences do not re-queue a settled URL. Only one worker request processes the scan at a time. HTTP request timeouts are capped to the worker's remaining time budget, and URLs left unchecked stay queued for the next request. Network failures are recorded without repeating the same request immediately, so the worker can move on and retry later. The scanner also uses per-resource deduplication, redirect limits, response-size limits, and safe retry scheduling. Manual scanning remains available when WordPress cron is delayed.
 
 ### Privacy
 
@@ -100,6 +100,10 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 
 == Changelog ==
 
+= 1.0.8 =
+* Stopped issuing an immediate GET request after a HEAD network failure or timeout; the URL is recorded as unverified and retried later so the scan can continue.
+* Kept batch transport failures and missing responses from triggering a second sequential network attempt.
+
 = 1.0.7 =
 * Capped each HTTP request to the remaining worker time budget so slow destinations cannot hold a scan request beyond its configured work window.
 * Kept unchecked URLs queued for the next worker request when the time budget expires.
@@ -147,6 +151,9 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 * Added evidence-based HTTP classifications, URL deduplication, bounded scanning, safe repairs, and conflict-aware undo.
 
 == Upgrade Notice ==
+
+= 1.0.8 =
+Unresponsive destinations no longer cause an immediate duplicate request; scan work moves on and retries them later.
 
 = 1.0.7 =
 Worker requests now respect the configured time budget and cannot overlap, which helps keep scans predictable on shared hosting.

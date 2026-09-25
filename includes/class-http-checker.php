@@ -58,7 +58,10 @@ final class Http_Checker {
 		if ( ! class_exists( '\\WpOrg\\Requests\\Requests' ) || ! class_exists( '\\WP_HTTP_Requests_Hooks' ) ) {
 			$results = array();
 			foreach ( $entries as $key => $entry ) {
-				$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+				$result = self::check_with_initial( $entry['url'], $entry['retry'], null, $deadline );
+				if ( empty( $result['deferred'] ) ) {
+					$results[ $key ] = $result;
+				}
 			}
 			return $results;
 		}
@@ -104,18 +107,32 @@ final class Http_Checker {
 		try {
 			$responses = \WpOrg\Requests\Requests::request_multiple( $requests );
 		} catch ( \Throwable $error ) {
-			/* A host transport or third-party hook may reject multiplexing; never lose a check. */
-			foreach ( $entries as $key => $entry ) {
-				if ( ! isset( $results[ $key ] ) ) {
-					$results[ $key ] = self::check_with_initial( $entry['url'], $entry['retry'], null, $deadline );
-				}
+			/* Do not repeat the same stalled network work in a sequential fallback. */
+			foreach ( $requests as $key => $request ) {
+				$started         = isset( $starts[ $key ] ) ? $starts[ $key ] : $batch_started;
+				$duration        = microtime( true ) - $started;
+				$results[ $key ] = self::parallel_failure(
+					$entries[ $key ]['url'],
+					$entries[ $key ]['retry'],
+					$duration,
+					$error->getMessage(),
+					$settings
+				);
 			}
 			return $results;
 		}
 
 		foreach ( $requests as $key => $request ) {
 			if ( ! array_key_exists( $key, $responses ) ) {
-				$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], null, $deadline );
+				$started         = isset( $starts[ $key ] ) ? $starts[ $key ] : $batch_started;
+				$duration        = microtime( true ) - $started;
+				$results[ $key ] = self::parallel_failure(
+					$entries[ $key ]['url'],
+					$entries[ $key ]['retry'],
+					$duration,
+					__( 'The parallel request returned no response.', 'simple-broken-link-checker' ),
+					$settings
+				);
 				continue;
 			}
 			$duration        = isset( $timings[ $key ] ) ? $timings[ $key ] : microtime( true ) - $batch_started;
@@ -169,11 +186,16 @@ final class Http_Checker {
 			$response      = $head;
 
 			/*
-			 * HEAD is only an optimization. Retry with GET when it is inconclusive,
-			 * unsupported, or returns a server error. Definitive 404/410 responses
-			 * do not need a second request and this keeps large scans practical.
+			 * Retry with GET only after an HTTP response shows that HEAD was
+			 * unsupported or inconclusive. A transport failure (such as a timeout)
+			 * gets recorded and retried later instead of repeating the same wait.
 			 */
-			if ( $head['error'] || 0 === (int) $head['code'] || in_array( (int) $head['code'], array( 405, 406 ), true ) || ( $head['code'] >= 500 && $head['code'] <= 599 ) ) {
+			$head_needs_get = ! $head['error'] && (
+				0 === (int) $head['code'] ||
+				in_array( (int) $head['code'], array( 405, 406 ), true ) ||
+				( $head['code'] >= 500 && $head['code'] <= 599 )
+			);
+			if ( $head_needs_get ) {
 				$get = self::request( $current, 'GET', $settings, $deadline );
 				if ( ! empty( $get['deferred'] ) ) {
 					if ( in_array( (int) $head['code'], array( 405, 406 ), true ) ) {
@@ -438,6 +460,37 @@ final class Http_Checker {
 			'error'      => true,
 			'error_code' => 'http_request_failed',
 			'duration'   => (float) $duration,
+		);
+	}
+
+	/**
+	 * Turn a failed batch request into an unverified result without retrying it immediately.
+	 *
+	 * @param string $url         URL.
+	 * @param int    $retry_count Previous retry count.
+	 * @param float  $duration    Elapsed time.
+	 * @param string $message     Transport error message.
+	 * @param array  $settings    Plugin settings.
+	 * @return array
+	 */
+	private static function parallel_failure( $url, $retry_count, $duration, $message, $settings ) {
+		$failure = array(
+			'code'       => 0,
+			'message'    => sanitize_text_field( $message ),
+			'error'      => true,
+			'error_code' => 'http_request_failed',
+			'duration'   => (float) $duration,
+		);
+		return self::network_result(
+			$failure['error_code'],
+			$failure['message'],
+			$url,
+			array(),
+			array( self::history_item( 'HEAD', $url, $failure ) ),
+			$duration,
+			$retry_count,
+			0,
+			absint( $settings['max_retries'] )
 		);
 	}
 
