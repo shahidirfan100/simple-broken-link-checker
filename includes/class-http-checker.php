@@ -33,10 +33,12 @@ final class Http_Checker {
 	 * single checks. Older WordPress transports fall back to sequential checks.
 	 *
 	 * @param array $resources Resource objects or URL strings.
+	 * @param float $deadline  Optional worker deadline as a microtime timestamp.
 	 * @return array Results keyed by resource ID or input index.
 	 */
-	public static function check_many( $resources ) {
-		$entries = array();
+	public static function check_many( $resources, $deadline = 0.0 ) {
+		$deadline = (float) $deadline;
+		$entries  = array();
 		foreach ( (array) $resources as $key => $resource ) {
 			$url   = is_object( $resource ) && isset( $resource->url ) ? (string) $resource->url : (string) $resource;
 			$retry = is_object( $resource ) && isset( $resource->retry_count ) ? absint( $resource->retry_count ) : 0;
@@ -72,13 +74,19 @@ final class Http_Checker {
 		};
 
 		foreach ( $entries as $key => $entry ) {
+			if ( $deadline > 0 && microtime( true ) >= $deadline ) {
+				continue;
+			}
 			$safety = Ssrf_Guard::validate( $entry['url'] );
 			if ( empty( $safety['safe'] ) ) {
 				/* Preserve the single-check safety classification without a network call. */
-				$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+				$results[ $key ] = self::check_with_initial( $entry['url'], $entry['retry'], null, $deadline, $safety );
 				continue;
 			}
-			$args             = self::request_args( $entry['url'], 'HEAD', $settings );
+			$args = self::request_args( $entry['url'], 'HEAD', $settings, $deadline );
+			if ( $deadline > 0 && $args['timeout'] < 1 ) {
+				continue;
+			}
 			$starts[ $key ]   = $batch_started;
 			$requests[ $key ] = array(
 				'url'     => $entry['url'],
@@ -99,7 +107,7 @@ final class Http_Checker {
 			/* A host transport or third-party hook may reject multiplexing; never lose a check. */
 			foreach ( $entries as $key => $entry ) {
 				if ( ! isset( $results[ $key ] ) ) {
-					$results[ $key ] = self::check( $entry['url'], $entry['retry'] );
+					$results[ $key ] = self::check_with_initial( $entry['url'], $entry['retry'], null, $deadline );
 				}
 			}
 			return $results;
@@ -107,12 +115,12 @@ final class Http_Checker {
 
 		foreach ( $requests as $key => $request ) {
 			if ( ! array_key_exists( $key, $responses ) ) {
-				$results[ $key ] = self::check( $entries[ $key ]['url'], $entries[ $key ]['retry'] );
+				$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], null, $deadline );
 				continue;
 			}
 			$duration        = isset( $timings[ $key ] ) ? $timings[ $key ] : microtime( true ) - $batch_started;
 			$initial         = self::parallel_response( $responses[ $key ], $duration );
-			$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], $initial );
+			$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], $initial, $deadline );
 		}
 		return $results;
 	}
@@ -125,10 +133,10 @@ final class Http_Checker {
 	 * @param array|null $initial_response Initial HEAD response.
 	 * @return array
 	 */
-	private static function check_with_initial( $url, $retry_count, $initial_response ) {
+	private static function check_with_initial( $url, $retry_count, $initial_response, $deadline = 0.0, $initial_safety = null ) {
 		$settings    = Settings::all();
 		$max_retries = absint( $settings['max_retries'] );
-		$safety      = Ssrf_Guard::validate( $url );
+		$safety      = is_array( $initial_safety ) ? $initial_safety : Ssrf_Guard::validate( $url );
 		if ( empty( $safety['safe'] ) ) {
 			$category    = ! empty( $safety['code'] ) ? sanitize_key( $safety['code'] ) : 'unsafe_request';
 			$status_text = 'dns_error' === $category ? __( 'DNS error', 'simple-broken-link-checker' ) : __( 'Request not sent', 'simple-broken-link-checker' );
@@ -150,7 +158,10 @@ final class Http_Checker {
 			if ( $first_request && is_array( $initial_response ) ) {
 				$head = $initial_response;
 			} else {
-				$head = self::request( $current, 'HEAD', $settings );
+				$head = self::request( $current, 'HEAD', $settings, $deadline );
+				if ( ! empty( $head['deferred'] ) ) {
+					return array( 'deferred' => true );
+				}
 			}
 			$first_request = false;
 			$total_time   += (float) $head['duration'];
@@ -163,10 +174,16 @@ final class Http_Checker {
 			 * do not need a second request and this keeps large scans practical.
 			 */
 			if ( $head['error'] || 0 === (int) $head['code'] || in_array( (int) $head['code'], array( 405, 406 ), true ) || ( $head['code'] >= 500 && $head['code'] <= 599 ) ) {
-				$get         = self::request( $current, 'GET', $settings );
-				$total_time += (float) $get['duration'];
-				$history[]   = self::history_item( 'GET', $current, $get );
-				$response    = $get;
+				$get = self::request( $current, 'GET', $settings, $deadline );
+				if ( ! empty( $get['deferred'] ) ) {
+					if ( in_array( (int) $head['code'], array( 405, 406 ), true ) ) {
+						return self::result( 'unverified', 'unverified', $head['code'], $url, 'verification_deferred', __( 'Verification deferred', 'simple-broken-link-checker' ), __( 'The HEAD request did not establish the link status, and the worker time limit was reached before a GET request could confirm it.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, $retry_count, $current, $redirect_count, time() + 120 );
+					}
+				} else {
+					$total_time += (float) $get['duration'];
+					$history[]   = self::history_item( 'GET', $current, $get );
+					$response    = $get;
+				}
 			}
 
 			$final_response = $response;
@@ -184,9 +201,15 @@ final class Http_Checker {
 				/* translators: %d: Maximum number of allowed redirect hops. */
 				return self::result( 'redirect', 'likely', $code, $url, 'too_many_redirects', self::status_name( $code ), sprintf( __( 'The link redirected more than the configured limit of %d hops.', 'simple-broken-link-checker' ), $max_redirects ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 			}
+			if ( $deadline > 0 && microtime( true ) >= $deadline ) {
+				return self::deferred_redirect( $url, $code, $current, $next, $redirects, $history, $total_time, $redirect_count );
+			}
 			$next_safety = Ssrf_Guard::validate( $next );
 			if ( empty( $next_safety['safe'] ) ) {
 				return self::result( 'unverified', 'unverified', $code, $url, 'unsafe_redirect', self::status_name( $code ), __( 'The redirect chain was stopped because its next destination failed the local safety checks.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $url, 0 );
+			}
+			if ( $deadline > 0 && microtime( true ) >= $deadline ) {
+				return self::deferred_redirect( $url, $code, $current, $next, $redirects, $history, $total_time, $redirect_count );
 			}
 			$next_hash   = Url::hash( $next );
 			$redirects[] = array(
@@ -245,11 +268,14 @@ final class Http_Checker {
 	 * @param array  $settings Settings.
 	 * @return array
 	 */
-	private static function request( $url, $method, $settings ) {
+	private static function request( $url, $method, $settings, $deadline = 0.0 ) {
 		$start = microtime( true );
-		$args  = self::request_args( $url, $method, $settings );
-		$home  = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
-		$host  = wp_parse_url( $url, PHP_URL_HOST );
+		$args  = self::request_args( $url, $method, $settings, $deadline );
+		if ( $deadline > 0 && $args['timeout'] < 1 ) {
+			return array( 'deferred' => true );
+		}
+		$home = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+		$host = wp_parse_url( $url, PHP_URL_HOST );
 		if ( $home && $host && strtolower( $home ) === strtolower( $host ) ) {
 			$response = wp_remote_request( $url, $args );
 		} else {
@@ -284,11 +310,16 @@ final class Http_Checker {
 	 * @param array  $settings Settings.
 	 * @return array
 	 */
-	private static function request_args( $url, $method, $settings ) {
+	private static function request_args( $url, $method, $settings, $deadline = 0.0 ) {
+		$timeout = absint( $settings['timeout'] );
+		if ( $deadline > 0 ) {
+			$remaining = $deadline - microtime( true );
+			$timeout   = $remaining >= 2 ? min( $timeout, (int) floor( $remaining ) - 1 ) : 0;
+		}
 		$args = array(
 			'method'              => $method,
-			'timeout'             => absint( $settings['timeout'] ),
-			'connect_timeout'     => absint( $settings['timeout'] ),
+			'timeout'             => $timeout,
+			'connect_timeout'     => $timeout,
 			'redirection'         => 0,
 			'limit_response_size' => absint( $settings['max_body_bytes'] ),
 			'sslverify'           => true,
@@ -305,7 +336,42 @@ final class Http_Checker {
 		if ( 'GET' === $method ) {
 			$args['headers']['Range'] = 'bytes=0-' . max( 0, absint( $settings['max_body_bytes'] ) - 1 );
 		}
-		return apply_filters( 'http_request_args', $args, $url );
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WordPress HTTP request-arguments filter.
+		$args = apply_filters( 'http_request_args', $args, $url );
+		if ( $deadline > 0 ) {
+			$remaining = $deadline - microtime( true );
+			if ( $remaining < 2 ) {
+				$args['timeout']         = 0;
+				$args['connect_timeout'] = 0;
+			} else {
+				$budget                  = (int) floor( $remaining ) - 1;
+				$args['timeout']         = min( max( 1, (int) $args['timeout'] ), $budget );
+				$args['connect_timeout'] = min( max( 1, (int) $args['connect_timeout'] ), $args['timeout'] );
+			}
+		}
+		return $args;
+	}
+
+	/**
+	 * Record a known redirect without starting another request after the worker deadline.
+	 *
+	 * @param string $url           Original URL.
+	 * @param int    $code          Redirect response code.
+	 * @param string $current       Current URL.
+	 * @param string $next          Redirect destination.
+	 * @param array  $redirects     Redirects already recorded.
+	 * @param array  $history       Request history.
+	 * @param float  $total_time    Total request time.
+	 * @param int    $redirect_count Redirect count.
+	 * @return array
+	 */
+	private static function deferred_redirect( $url, $code, $current, $next, $redirects, $history, $total_time, $redirect_count ) {
+		$redirects[] = array(
+			'from'   => $current,
+			'status' => $code,
+			'to'     => $next,
+		);
+		return self::result( 'redirect', 'likely', $code, $url, 'redirect_deferred', self::status_name( $code ), __( 'The redirect was recorded, but the next destination was not requested because this worker reached its time limit.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $next, $redirect_count + 1 );
 	}
 
 	/**
@@ -317,7 +383,7 @@ final class Http_Checker {
 	 * @return array
 	 */
 	private static function requests_options( $url, $args, $complete ) {
-		$options           = array(
+		$options = array(
 			'timeout'          => (float) $args['timeout'],
 			'connect_timeout'  => (float) $args['connect_timeout'],
 			'useragent'        => (string) $args['user-agent'],
@@ -330,6 +396,7 @@ final class Http_Checker {
 			'hooks'            => new \WP_HTTP_Requests_Hooks( $url, $args ),
 			'complete'         => $complete,
 		);
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WordPress SSL verification filter.
 		$options['verify'] = apply_filters( 'https_ssl_verify', $options['verify'], $url );
 		$proxy             = new \WP_HTTP_Proxy();
 		if ( $proxy->is_enabled() && $proxy->send_through_proxy( $url ) ) {

@@ -3,7 +3,7 @@
  * Plugin Name:       Simple Broken Link Checker
  * Plugin URI:        https://wordpress.org/plugins/simple-broken-link-checker/
  * Description:       Find and review broken links, redirects, and missing images locally with clear evidence and safe repairs.
- * Version:           1.0.6
+ * Version:           1.0.7
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Shahid Irfan
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SBLC_VERSION', '1.0.6' );
+define( 'SBLC_VERSION', '1.0.7' );
 define( 'SBLC_PLUGIN_FILE', __FILE__ );
 define( 'SBLC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SBLC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

@@ -13,7 +13,8 @@ defined( 'ABSPATH' ) || exit;
  * Runs resumable discovery and URL verification work.
  */
 final class Scanner {
-	const LOCK_OPTION = 'sblc_scan_lock';
+	const LOCK_OPTION        = 'sblc_scan_lock';
+	const WORKER_LOCK_OPTION = 'sblc_scan_worker_lock';
 
 	/**
 	 * Start a new scan.
@@ -45,6 +46,26 @@ final class Scanner {
 	 * @return array|\WP_Error
 	 */
 	public static function step( $scan_id ) {
+		$worker_lock = self::acquire_worker_lock();
+		if ( ! $worker_lock ) {
+			$scan = Database::get_scan( $scan_id );
+			return $scan ? self::progress( $scan ) : new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+		}
+
+		try {
+			return self::process_step( $scan_id );
+		} finally {
+			self::release_worker_lock( $worker_lock );
+		}
+	}
+
+	/**
+	 * Process one bounded worker request while holding the worker lock.
+	 *
+	 * @param int $scan_id Scan ID.
+	 * @return array|\WP_Error
+	 */
+	private static function process_step( $scan_id ) {
 		$scan = Database::get_scan( $scan_id );
 		if ( ! $scan ) {
 			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
@@ -270,10 +291,13 @@ final class Scanner {
 			}
 			if ( ! empty( $active ) ) {
 				/* A user-started or scheduled scan is a fresh verification pass. */
-				$results = Http_Checker::check_many( $active );
+				$results = Http_Checker::check_many( $active, $deadline );
 			}
 			foreach ( $active as $resource_id => $resource ) {
-				$result = isset( $results[ $resource_id ] ) ? $results[ $resource_id ] : Http_Checker::check( $resource->url, absint( $resource->retry_count ) );
+				if ( ! isset( $results[ $resource_id ] ) || ! empty( $results[ $resource_id ]['deferred'] ) ) {
+					continue;
+				}
+				$result = $results[ $resource_id ];
 				Database::save_result( $resource_id, $scan->id, $result );
 			}
 		}
@@ -365,6 +389,47 @@ final class Scanner {
 		$query          = $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $new_serialized, self::LOCK_OPTION, $old_serialized );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic compare-and-swap lock update; all values are prepared and the options table is trusted.
 		return 1 === (int) $wpdb->query( $query );
+	}
+
+	/**
+	 * Prevent overlapping cron and admin requests from checking the same batch.
+	 *
+	 * @return array|false Lock value or false when another worker is active.
+	 */
+	private static function acquire_worker_lock() {
+		$lock = array(
+			'token'     => wp_generate_uuid4(),
+			'locked_at' => time(),
+		);
+		if ( add_option( self::WORKER_LOCK_OPTION, $lock, '', false ) ) {
+			return $lock;
+		}
+
+		$old = get_option( self::WORKER_LOCK_OPTION, array() );
+		if ( is_array( $old ) && ! empty( $old['locked_at'] ) && time() - absint( $old['locked_at'] ) < 120 ) {
+			return false;
+		}
+
+		global $wpdb;
+		$old_serialized = maybe_serialize( $old );
+		$new_serialized = maybe_serialize( $lock );
+		$query          = $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $new_serialized, self::WORKER_LOCK_OPTION, $old_serialized );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.NoCache, WordPress.DB.PreparedSQL.NotPrepared -- Atomic compare-and-swap recovery for an abandoned worker lock; all values are prepared.
+		return 1 === (int) $wpdb->query( $query ) ? $lock : false;
+	}
+
+	/**
+	 * Release only the worker lock owned by this request.
+	 *
+	 * @param array $lock Lock value.
+	 * @return void
+	 */
+	private static function release_worker_lock( $lock ) {
+		global $wpdb;
+		$query = $wpdb->prepare( 'DELETE FROM %i WHERE option_name = %s AND option_value = %s', $wpdb->options, self::WORKER_LOCK_OPTION, maybe_serialize( $lock ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.NoCache, WordPress.DB.PreparedSQL.NotPrepared -- Delete only this request's atomic prepared worker-lock value.
+		$wpdb->query( $query );
+		wp_cache_delete( self::WORKER_LOCK_OPTION, 'options' );
 	}
 
 	/**

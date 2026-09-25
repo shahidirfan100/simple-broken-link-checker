@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Simple Broken Link Checker 1.0.6\n"
+"Project-Id-Version: Simple Broken Link Checker 1.0.7\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/simple-broken-link-checker\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-15T05:46:40+00:00\n"
+"POT-Creation-Date: 2026-09-25T10:32:56+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: simple-broken-link-checker\n"
@@ -167,7 +167,7 @@ msgid "DNS Error"
 msgstr ""
 
 #: admin/class-admin.php:80
-#: includes/class-http-checker.php:237
+#: includes/class-http-checker.php:498
 msgid "Timeout"
 msgstr ""
 
@@ -599,105 +599,131 @@ msgstr ""
 msgid "This URL has been discovered and is waiting for its verification request."
 msgstr ""
 
+#: includes/class-database.php:429
+#: includes/class-repair.php:196
+#: includes/class-rest.php:276
+msgid "Recheck needed"
+msgstr ""
+
+#: includes/class-database.php:430
+msgid "The source was restored. Recheck this resource to collect fresh evidence."
+msgstr ""
+
 #: includes/class-extractor.php:199
 #: includes/class-extractor.php:246
 msgid "The selected URL was not found in the source content."
 msgstr ""
 
-#: includes/class-http-checker.php:29
-#: includes/class-http-checker.php:232
+#: includes/class-http-checker.php:142
+#: includes/class-http-checker.php:493
 msgid "DNS error"
 msgstr ""
 
-#: includes/class-http-checker.php:29
+#: includes/class-http-checker.php:142
 msgid "Request not sent"
 msgstr ""
 
-#: includes/class-http-checker.php:30
+#: includes/class-http-checker.php:143
 msgid "The domain could not be resolved from this server, so no request was sent."
 msgstr ""
 
-#: includes/class-http-checker.php:30
+#: includes/class-http-checker.php:143
 msgid "This URL was not requested because it failed the local safety checks."
 msgstr ""
 
+#: includes/class-http-checker.php:180
+msgid "Verification deferred"
+msgstr ""
+
+#: includes/class-http-checker.php:180
+msgid "The HEAD request did not establish the link status, and the worker time limit was reached before a GET request could confirm it."
+msgstr ""
+
 #. translators: %d: Maximum number of allowed redirect hops.
-#: includes/class-http-checker.php:74
+#: includes/class-http-checker.php:202
 #, php-format
 msgid "The link redirected more than the configured limit of %d hops."
 msgstr ""
 
-#: includes/class-http-checker.php:78
+#: includes/class-http-checker.php:209
 msgid "The redirect chain was stopped because its next destination failed the local safety checks."
 msgstr ""
 
-#: includes/class-http-checker.php:87
+#: includes/class-http-checker.php:221
 msgid "Redirect loop"
 msgstr ""
 
-#: includes/class-http-checker.php:87
+#: includes/class-http-checker.php:221
 msgid "The redirect chain returned to a URL that was already visited."
 msgstr ""
 
-#: includes/class-http-checker.php:100
+#: includes/class-http-checker.php:234
 msgid "The URL works, but it reaches a different destination through a redirect chain."
 msgstr ""
 
-#: includes/class-http-checker.php:102
+#: includes/class-http-checker.php:236
 msgid "The resource responded successfully."
 msgstr ""
 
-#: includes/class-http-checker.php:105
+#: includes/class-http-checker.php:239
 msgid "The server returned a redirect that could not be fully followed."
 msgstr ""
 
 #. translators: %d: HTTP response status code, such as 404 or 410.
-#: includes/class-http-checker.php:109
+#: includes/class-http-checker.php:243
 #, php-format
 msgid "The target returned definitive HTTP %d evidence. It is highly likely that the resource no longer exists."
 msgstr ""
 
-#: includes/class-http-checker.php:115
+#: includes/class-http-checker.php:249
 msgid "The remote server asked the scanner to slow down. This does not mean the link is broken."
 msgstr ""
 
-#: includes/class-http-checker.php:121
+#: includes/class-http-checker.php:255
 msgid "The remote server returned a temporary error. The scanner will leave this for a later recheck instead of calling it broken."
 msgstr ""
 
-#: includes/class-http-checker.php:124
+#: includes/class-http-checker.php:258
 msgid "The remote website rejected automated verification. This does not necessarily mean the link is broken."
 msgstr ""
 
-#: includes/class-http-checker.php:126
+#: includes/class-http-checker.php:260
 msgid "The scanner could not obtain enough evidence to call this link broken."
 msgstr ""
 
-#: includes/class-http-checker.php:219
+#: includes/class-http-checker.php:374
+msgid "The redirect was recorded, but the next destination was not requested because this worker reached its time limit."
+msgstr ""
+
+#: includes/class-http-checker.php:433
+msgid "The parallel request failed."
+msgstr ""
+
+#: includes/class-http-checker.php:480
 msgid "Network error"
 msgstr ""
 
-#: includes/class-http-checker.php:220
+#: includes/class-http-checker.php:481
 msgid "The scanner could not complete a safe request. This is not enough evidence to call the link broken."
 msgstr ""
 
-#: includes/class-http-checker.php:227
+#: includes/class-http-checker.php:488
 msgid "SSL error"
 msgstr ""
 
-#: includes/class-http-checker.php:228
+#: includes/class-http-checker.php:489
 msgid "The HTTPS certificate or TLS negotiation could not be verified."
 msgstr ""
 
-#: includes/class-http-checker.php:233
+#: includes/class-http-checker.php:494
 msgid "The domain could not be resolved from this server."
 msgstr ""
 
-#: includes/class-http-checker.php:238
+#: includes/class-http-checker.php:499
 msgid "The server did not respond within the configured timeout."
 msgstr ""
 
-#: includes/class-http-checker.php:330
+#: includes/class-http-checker.php:591
 msgid "No response"
 msgstr ""
 
@@ -725,81 +751,103 @@ msgstr ""
 msgid "The source content could not be loaded."
 msgstr ""
 
-#: includes/class-repair.php:50
+#: includes/class-repair.php:57
 msgid "Enter a valid HTTP or HTTPS replacement URL."
 msgstr ""
 
-#: includes/class-repair.php:58
+#: includes/class-repair.php:61
+msgid "The replacement URL could not be prepared for verification. The source was not changed."
+msgstr ""
+
+#: includes/class-repair.php:68
+msgid "The replacement URL did not return healthy or redirect evidence, so the original source was not changed."
+msgstr ""
+
+#: includes/class-repair.php:81
 msgid "Only URL replacement is supported for menu items."
 msgstr ""
 
-#: includes/class-repair.php:64
+#: includes/class-repair.php:87
 msgid "The menu item changed since this finding was recorded. Recheck it before editing."
 msgstr ""
 
-#: includes/class-repair.php:73
+#: includes/class-repair.php:96
 msgid "No source content was changed."
 msgstr ""
 
-#: includes/class-repair.php:76
+#: includes/class-repair.php:99
 msgid "This source type does not have a safe editor."
 msgstr ""
 
-#: includes/class-repair.php:100
+#: includes/class-repair.php:123
 msgid "The source was not changed because the undo record could not be created."
 msgstr ""
 
-#: includes/class-repair.php:109
+#: includes/class-repair.php:135
 msgid "The repair was not applied because WordPress could not save the source."
 msgstr ""
 
-#: includes/class-repair.php:112
+#: includes/class-repair.php:138
 msgid "WordPress could not save the repaired source."
 msgstr ""
 
-#: includes/class-repair.php:119
-#: includes/class-repair.php:180
-#: includes/class-rest.php:276
-msgid "Recheck needed"
+#: includes/class-repair.php:157
+msgid "The source was restored because its resource index could not be updated."
 msgstr ""
 
-#: includes/class-repair.php:120
+#: includes/class-repair.php:160
+msgid "The source was restored because the replacement could not be indexed."
+msgstr ""
+
+#: includes/class-repair.php:178
+msgid "The source was updated, the replacement was verified, and the old finding was removed when no sources still used it."
+msgstr ""
+
+#: includes/class-repair.php:187
+msgid "The link was unlinked and removed from the finding when no sources still used it."
+msgstr ""
+
+#: includes/class-repair.php:197
 msgid "The source was changed. Recheck this resource to collect fresh evidence."
 msgstr ""
 
-#: includes/class-repair.php:129
+#: includes/class-repair.php:206
 msgid "The source was updated and the change was recorded for undo."
 msgstr ""
 
-#: includes/class-repair.php:142
+#: includes/class-repair.php:219
 msgid "The repair record was not found."
 msgstr ""
 
-#: includes/class-repair.php:145
+#: includes/class-repair.php:222
 msgid "This repair has already been undone."
 msgstr ""
 
-#: includes/class-repair.php:157
+#: includes/class-repair.php:235
 msgid "You do not have permission to undo this repair."
 msgstr ""
 
-#: includes/class-repair.php:161
+#: includes/class-repair.php:239
 msgid "Undo was blocked because the source changed after this repair."
 msgstr ""
 
-#: includes/class-repair.php:162
+#: includes/class-repair.php:240
 msgid "Undo was blocked because the source changed after this repair. Review the source manually."
 msgstr ""
 
-#: includes/class-repair.php:166
+#: includes/class-repair.php:244
 msgid "WordPress could not restore the original source."
 msgstr ""
 
-#: includes/class-repair.php:181
-msgid "The source was restored. Recheck this resource to collect fresh evidence."
+#: includes/class-repair.php:276
+msgid "The source was restored, but its resource index could not be restored. Review the finding before scanning again."
 msgstr ""
 
-#: includes/class-repair.php:188
+#: includes/class-repair.php:277
+msgid "The source was restored, but the finding index could not be restored."
+msgstr ""
+
+#: includes/class-repair.php:294
 msgid "The original source was restored."
 msgstr ""
 
@@ -848,59 +896,60 @@ msgstr ""
 msgid "The selected resources were updated."
 msgstr ""
 
-#: includes/class-scanner.php:26
+#: includes/class-scanner.php:27
 msgid "A scan is already in progress."
 msgstr ""
 
-#: includes/class-scanner.php:29
+#: includes/class-scanner.php:30
 msgid "Another scan request is being started. Please try again."
 msgstr ""
 
-#: includes/class-scanner.php:35
+#: includes/class-scanner.php:36
 msgid "The scan could not be created."
 msgstr ""
 
-#: includes/class-scanner.php:50
-#: includes/class-scanner.php:134
+#: includes/class-scanner.php:52
+#: includes/class-scanner.php:71
+#: includes/class-scanner.php:155
 msgid "The requested scan was not found."
 msgstr ""
 
-#: includes/class-scanner.php:121
+#: includes/class-scanner.php:142
 msgid "The scan stopped unexpectedly. Existing findings were preserved."
 msgstr ""
 
-#: includes/class-scanner.php:285
+#: includes/class-scanner.php:321
 msgid "No scan has been run yet."
 msgstr ""
 
 #. translators: 1: checked URL count, 2: discovered URL count.
-#: includes/class-scanner.php:306
+#: includes/class-scanner.php:342
 #, php-format
 msgid "Verifying discovered URLs before reading more sources (%1$d of %2$d complete)."
 msgstr ""
 
-#: includes/class-scanner.php:308
+#: includes/class-scanner.php:344
 msgid "Reading WordPress content. Each URL is verified before more sources are fetched."
 msgstr ""
 
-#: includes/class-scanner.php:311
+#: includes/class-scanner.php:347
 msgid "Verifying unique URLs with bounded local requests."
 msgstr ""
 
-#: includes/class-scanner.php:313
+#: includes/class-scanner.php:349
 msgid "Scan completed."
 msgstr ""
 
-#: includes/class-scanner.php:315
+#: includes/class-scanner.php:351
 msgid "Scan stopped."
 msgstr ""
 
-#: includes/class-scanner.php:424
+#: includes/class-scanner.php:501
 msgid "Simple Broken Link Checker scan complete"
 msgstr ""
 
 #. translators: 1: Unique URL count, 2: Broken count, 3: Needs-review count, 4: Redirect count, 5: Healthy count.
-#: includes/class-scanner.php:427
+#: includes/class-scanner.php:504
 #, php-format
 msgid ""
 "Your local link scan is complete.\n"

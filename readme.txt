@@ -4,7 +4,7 @@ Tags: broken links, link checker, broken images, redirects, local scanner
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.6
+Stable tag: 1.0.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -42,7 +42,7 @@ Supported post content, approved comment content, and custom menu URLs can be re
 
 ### Resource controls
 
-Scanning runs in small resumable worker requests. Each discovered source batch is verified before the next source batch is read, and repeated occurrences do not re-queue a settled URL. It uses a recoverable lock, bounded execution time, per-resource deduplication, request timeouts, redirect limits, response-size limits, and safe retry scheduling. Manual scanning remains available when WordPress cron is delayed.
+Scanning runs in small resumable worker requests. Each discovered source batch is verified before the next source batch is read, and repeated occurrences do not re-queue a settled URL. Only one worker request processes the scan at a time. HTTP request timeouts are capped to the worker's remaining time budget, and URLs left unchecked stay queued for the next request. The scanner also uses per-resource deduplication, redirect limits, response-size limits, and safe retry scheduling. Manual scanning remains available when WordPress cron is delayed.
 
 ### Privacy
 
@@ -100,6 +100,11 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 
 == Changelog ==
 
+= 1.0.7 =
+* Capped each HTTP request to the remaining worker time budget so slow destinations cannot hold a scan request beyond its configured work window.
+* Kept unchecked URLs queued for the next worker request when the time budget expires.
+* Serialized worker requests so cron and admin polling cannot issue duplicate checks for the same batch.
+
 = 1.0.6 =
 * Added bounded parallel URL verification with a configurable 1–8 request limit to reduce scan time on large sites.
 * Avoided redundant GET requests for definitive 404 and 410 responses while retaining GET fallback for inconclusive HEAD responses.
@@ -140,3 +145,8 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 = 1.0.0 =
 * New local-only broken link and image checker.
 * Added evidence-based HTTP classifications, URL deduplication, bounded scanning, safe repairs, and conflict-aware undo.
+
+== Upgrade Notice ==
+
+= 1.0.7 =
+Worker requests now respect the configured time budget and cannot overlap, which helps keep scans predictable on shared hosting.
