@@ -89,15 +89,6 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 * Structured page-builder data is review-only until a source-specific safe editor is available.
 * WordPress cron may be delayed or disabled by hosting configuration. The findings screen provides manual worker progress.
 
-== Screenshots ==
-
-1. Dashboard overview with realistic healthy, redirected, and broken results from a completed scan.
-2. Broken-link filter focused on confirmed HTTP evidence.
-3. Evidence panel with request history, source context, and safe repair controls.
-4. Redirect evidence showing the recorded hop and final destination.
-5. Settings for request safety, source discovery, exclusions, scheduling, and data retention.
-6. Active bounded scan with visible progress and a safe stop control.
-
 == Changelog ==
 
 = 1.0.9 =
