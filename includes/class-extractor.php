@@ -2,10 +2,10 @@
 /**
  * Content URL extraction and conservative HTML edits.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -196,7 +196,7 @@ final class Extractor {
 				},
 				$content
 			);
-			return $changed ? $result : new \WP_Error( 'sblc_not_found', __( 'The selected URL was not found in the source content.', 'simple-broken-link-checker' ) );
+			return $changed ? $result : new \WP_Error( 'sblc_not_found', __( 'The selected URL was not found in the source content.', 'linksolva-broken-link-checker' ) );
 		}
 
 		if ( 'unlink' === $operation ) {
@@ -243,6 +243,6 @@ final class Extractor {
 				$changed
 			);
 		}
-		return new \WP_Error( 'sblc_not_found', __( 'The selected URL was not found in the source content.', 'simple-broken-link-checker' ) );
+		return new \WP_Error( 'sblc_not_found', __( 'The selected URL was not found in the source content.', 'linksolva-broken-link-checker' ) );
 	}
 }

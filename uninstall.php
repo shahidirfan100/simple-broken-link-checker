@@ -2,7 +2,7 @@
 /**
  * Remove plugin data only when the administrator explicitly enabled deletion.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;

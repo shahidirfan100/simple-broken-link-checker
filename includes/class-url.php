@@ -2,10 +2,10 @@
 /**
  * URL normalization and relative URL handling.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 

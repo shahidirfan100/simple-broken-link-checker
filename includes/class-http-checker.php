@@ -2,10 +2,10 @@
 /**
  * Evidence-based local HTTP verifier.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -132,7 +132,7 @@ final class Http_Checker {
 					$entries[ $key ]['url'],
 					$entries[ $key ]['retry'],
 					$duration,
-					__( 'The parallel request returned no response.', 'simple-broken-link-checker' ),
+					__( 'The parallel request returned no response.', 'linksolva-broken-link-checker' ),
 					$settings
 				);
 				continue;
@@ -158,8 +158,8 @@ final class Http_Checker {
 		$safety      = is_array( $initial_safety ) ? $initial_safety : Ssrf_Guard::validate( $url );
 		if ( empty( $safety['safe'] ) ) {
 			$category    = ! empty( $safety['code'] ) ? sanitize_key( $safety['code'] ) : 'unsafe_request';
-			$status_text = 'dns_error' === $category ? __( 'DNS error', 'simple-broken-link-checker' ) : __( 'Request not sent', 'simple-broken-link-checker' );
-			$explanation = 'dns_error' === $category ? __( 'The domain could not be resolved from this server, so no request was sent.', 'simple-broken-link-checker' ) : __( 'This URL was not requested because it failed the local safety checks.', 'simple-broken-link-checker' );
+			$status_text = 'dns_error' === $category ? __( 'DNS error', 'linksolva-broken-link-checker' ) : __( 'Request not sent', 'linksolva-broken-link-checker' );
+			$explanation = 'dns_error' === $category ? __( 'The domain could not be resolved from this server, so no request was sent.', 'linksolva-broken-link-checker' ) : __( 'This URL was not requested because it failed the local safety checks.', 'linksolva-broken-link-checker' );
 			return self::result( 'unverified', 'unverified', 0, $url, $category, $status_text, $explanation, array(), array(), 0, $retry_count );
 		}
 
@@ -201,7 +201,7 @@ final class Http_Checker {
 				$get = self::request( $current, 'GET', $settings, $deadline );
 				if ( ! empty( $get['deferred'] ) ) {
 					if ( in_array( (int) $head['code'], array( 405, 406 ), true ) ) {
-						return self::result( 'unverified', 'unverified', $head['code'], $url, 'verification_deferred', __( 'Verification deferred', 'simple-broken-link-checker' ), __( 'The HEAD request did not establish the link status, and the worker time limit was reached before a GET request could confirm it.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, $retry_count, $current, $redirect_count, time() + 120 );
+						return self::result( 'unverified', 'unverified', $head['code'], $url, 'verification_deferred', __( 'Verification deferred', 'linksolva-broken-link-checker' ), __( 'The HEAD request did not establish the link status, and the worker time limit was reached before a GET request could confirm it.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, $retry_count, $current, $redirect_count, time() + 120 );
 					}
 				} else {
 					$total_time += (float) $get['duration'];
@@ -223,14 +223,14 @@ final class Http_Checker {
 			}
 			if ( $redirect_count >= $max_redirects ) {
 				/* translators: %d: Maximum number of allowed redirect hops. */
-				return self::result( 'redirect', 'likely', $code, $url, 'too_many_redirects', self::status_name( $code ), sprintf( __( 'The link redirected more than the configured limit of %d hops.', 'simple-broken-link-checker' ), $max_redirects ), $redirects, $history, $total_time, 0, $current, $redirect_count );
+				return self::result( 'redirect', 'likely', $code, $url, 'too_many_redirects', self::status_name( $code ), sprintf( __( 'The link redirected more than the configured limit of %d hops.', 'linksolva-broken-link-checker' ), $max_redirects ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 			}
 			if ( $deadline > 0 && microtime( true ) >= $deadline ) {
 				return self::deferred_redirect( $url, $code, $current, $next, $redirects, $history, $total_time, $redirect_count );
 			}
 			$next_safety = Ssrf_Guard::validate( $next );
 			if ( empty( $next_safety['safe'] ) ) {
-				return self::result( 'unverified', 'unverified', $code, $url, 'unsafe_redirect', self::status_name( $code ), __( 'The redirect chain was stopped because its next destination failed the local safety checks.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $url, 0 );
+				return self::result( 'unverified', 'unverified', $code, $url, 'unsafe_redirect', self::status_name( $code ), __( 'The redirect chain was stopped because its next destination failed the local safety checks.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $url, 0 );
 			}
 			if ( $deadline > 0 && microtime( true ) >= $deadline ) {
 				return self::deferred_redirect( $url, $code, $current, $next, $redirects, $history, $total_time, $redirect_count );
@@ -242,7 +242,7 @@ final class Http_Checker {
 				'to'     => $next,
 			);
 			if ( isset( $visited[ $next_hash ] ) ) {
-				return self::result( 'redirect', 'likely', $code, $url, 'redirect_loop', __( 'Redirect loop', 'simple-broken-link-checker' ), __( 'The redirect chain returned to a URL that was already visited.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $next, ++$redirect_count );
+				return self::result( 'redirect', 'likely', $code, $url, 'redirect_loop', __( 'Redirect loop', 'linksolva-broken-link-checker' ), __( 'The redirect chain returned to a URL that was already visited.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $next, ++$redirect_count );
 			}
 			$visited[ $next_hash ] = true;
 			$current               = $next;
@@ -255,33 +255,33 @@ final class Http_Checker {
 		}
 		if ( $code >= 200 && $code < 300 ) {
 			if ( $redirect_count > 0 ) {
-				return self::result( 'redirect', 'confirmed', $code, $url, 'redirect', self::status_name( $code ), __( 'The URL works, but it reaches a different destination through a redirect chain.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
+				return self::result( 'redirect', 'confirmed', $code, $url, 'redirect', self::status_name( $code ), __( 'The URL works, but it reaches a different destination through a redirect chain.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 			}
-			return self::result( 'healthy', 'confirmed', $code, $url, '', self::status_name( $code ), __( 'The resource responded successfully.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, 0 );
+			return self::result( 'healthy', 'confirmed', $code, $url, '', self::status_name( $code ), __( 'The resource responded successfully.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, 0 );
 		}
 		if ( $code >= 300 && $code < 400 ) {
-			return self::result( 'redirect', 'likely', $code, $url, 'redirect', self::status_name( $code ), __( 'The server returned a redirect that could not be fully followed.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, max( 1, $redirect_count ) );
+			return self::result( 'redirect', 'likely', $code, $url, 'redirect', self::status_name( $code ), __( 'The server returned a redirect that could not be fully followed.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, max( 1, $redirect_count ) );
 		}
 		if ( 404 === $code || 410 === $code ) {
 			/* translators: %d: HTTP response status code, such as 404 or 410. */
-			return self::result( 'broken', 'confirmed', $code, $url, 'http_' . $code, self::status_name( $code ), sprintf( __( 'The target returned definitive HTTP %d evidence. It is highly likely that the resource no longer exists.', 'simple-broken-link-checker' ), $code ), $redirects, $history, $total_time, 0, $current, $redirect_count );
+			return self::result( 'broken', 'confirmed', $code, $url, 'http_' . $code, self::status_name( $code ), sprintf( __( 'The target returned definitive HTTP %d evidence. It is highly likely that the resource no longer exists.', 'linksolva-broken-link-checker' ), $code ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 		}
 		if ( 429 === $code ) {
 			$next_retry   = $retry_count + 1;
 			$stored_retry = min( $max_retries, $next_retry );
 			$delay        = $next_retry <= $max_retries ? min( 3600, 120 * max( 1, $next_retry ) ) : DAY_IN_SECONDS;
-			return self::result( 'rate_limited', 'unverified', $code, $url, 'http_429', self::status_name( $code ), __( 'The remote server asked the scanner to slow down. This does not mean the link is broken.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, $stored_retry, $current, $redirect_count, time() + $delay );
+			return self::result( 'rate_limited', 'unverified', $code, $url, 'http_429', self::status_name( $code ), __( 'The remote server asked the scanner to slow down. This does not mean the link is broken.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, $stored_retry, $current, $redirect_count, time() + $delay );
 		}
 		if ( $code >= 500 && $code <= 599 ) {
 			$next_retry   = $retry_count + 1;
 			$stored_retry = min( $max_retries, $next_retry );
 			$delay        = $next_retry <= $max_retries ? min( 3600, 120 * max( 1, $next_retry ) ) : DAY_IN_SECONDS;
-			return self::result( 'temporary_error', 'unverified', $code, $url, 'http_' . $code, self::status_name( $code ), __( 'The remote server returned a temporary error. The scanner will leave this for a later recheck instead of calling it broken.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, $stored_retry, $current, $redirect_count, time() + $delay );
+			return self::result( 'temporary_error', 'unverified', $code, $url, 'http_' . $code, self::status_name( $code ), __( 'The remote server returned a temporary error. The scanner will leave this for a later recheck instead of calling it broken.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, $stored_retry, $current, $redirect_count, time() + $delay );
 		}
 		if ( in_array( $code, array( 401, 403, 405, 406, 407, 451 ), true ) ) {
-			return self::result( 'blocked', 'unverified', $code, $url, 'http_' . $code, self::status_name( $code ), __( 'The remote website rejected automated verification. This does not necessarily mean the link is broken.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
+			return self::result( 'blocked', 'unverified', $code, $url, 'http_' . $code, self::status_name( $code ), __( 'The remote website rejected automated verification. This does not necessarily mean the link is broken.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 		}
-		return self::result( 'unverified', 'unverified', $code, $url, $code ? 'http_' . $code : 'no_response', self::status_name( $code ), __( 'The scanner could not obtain enough evidence to call this link broken.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
+		return self::result( 'unverified', 'unverified', $code, $url, $code ? 'http_' . $code : 'no_response', self::status_name( $code ), __( 'The scanner could not obtain enough evidence to call this link broken.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $current, $redirect_count );
 	}
 
 	/**
@@ -351,7 +351,7 @@ final class Http_Checker {
 			'reject_unsafe_urls'  => true,
 			'blocking'            => true,
 			'body'                => '',
-			'user-agent'          => 'Mozilla/5.0 (compatible; Simple Broken Link Checker/' . SBLC_VERSION . '; +' . home_url( '/' ) . ')',
+			'user-agent'          => 'Mozilla/5.0 (compatible; LinkSolva - Broken Link Checker/' . LINKSOLVA_BLC_VERSION . '; +' . home_url( '/' ) . ')',
 			'headers'             => array(
 				'Accept'     => '*/*',
 				'Connection' => 'close',
@@ -395,7 +395,7 @@ final class Http_Checker {
 			'status' => $code,
 			'to'     => $next,
 		);
-		return self::result( 'redirect', 'likely', $code, $url, 'redirect_deferred', self::status_name( $code ), __( 'The redirect was recorded, but the next destination was not requested because this worker reached its time limit.', 'simple-broken-link-checker' ), $redirects, $history, $total_time, 0, $next, $redirect_count + 1 );
+		return self::result( 'redirect', 'likely', $code, $url, 'redirect_deferred', self::status_name( $code ), __( 'The redirect was recorded, but the next destination was not requested because this worker reached its time limit.', 'linksolva-broken-link-checker' ), $redirects, $history, $total_time, 0, $next, $redirect_count + 1 );
 	}
 
 	/**
@@ -454,7 +454,7 @@ final class Http_Checker {
 				'duration'   => (float) $duration,
 			);
 		}
-		$message = is_object( $response ) && method_exists( $response, 'getMessage' ) ? $response->getMessage() : __( 'The parallel request failed.', 'simple-broken-link-checker' );
+		$message = is_object( $response ) && method_exists( $response, 'getMessage' ) ? $response->getMessage() : __( 'The parallel request failed.', 'linksolva-broken-link-checker' );
 		return array(
 			'response'   => array(),
 			'code'       => 0,
@@ -532,26 +532,26 @@ final class Http_Checker {
 		$haystack     = strtolower( $error_code . ' ' . $message );
 		$status       = 'unverified';
 		$category     = 'network_error';
-		$title        = __( 'Network error', 'simple-broken-link-checker' );
-		$explanation  = __( 'The scanner could not complete a safe request. This is not enough evidence to call the link broken.', 'simple-broken-link-checker' );
+		$title        = __( 'Network error', 'linksolva-broken-link-checker' );
+		$explanation  = __( 'The scanner could not complete a safe request. This is not enough evidence to call the link broken.', 'linksolva-broken-link-checker' );
 		$next_retry   = $retry_count + 1;
 		$stored_retry = min( absint( $max_retries ), $next_retry );
 		$next         = time() + ( $next_retry <= absint( $max_retries ) ? min( 3600, 120 * max( 1, $next_retry ) ) : DAY_IN_SECONDS );
 		if ( false !== strpos( $haystack, 'ssl' ) || false !== strpos( $haystack, 'certificate' ) ) {
 			$status      = 'ssl_error';
 			$category    = 'ssl_error';
-			$title       = __( 'SSL error', 'simple-broken-link-checker' );
-			$explanation = __( 'The HTTPS certificate or TLS negotiation could not be verified.', 'simple-broken-link-checker' );
+			$title       = __( 'SSL error', 'linksolva-broken-link-checker' );
+			$explanation = __( 'The HTTPS certificate or TLS negotiation could not be verified.', 'linksolva-broken-link-checker' );
 		} elseif ( false !== strpos( $haystack, 'resolve' ) || false !== strpos( $haystack, 'dns' ) || false !== strpos( $haystack, 'host' ) ) {
 			$status      = 'dns_error';
 			$category    = 'dns_error';
-			$title       = __( 'DNS error', 'simple-broken-link-checker' );
-			$explanation = __( 'The domain could not be resolved from this server.', 'simple-broken-link-checker' );
+			$title       = __( 'DNS error', 'linksolva-broken-link-checker' );
+			$explanation = __( 'The domain could not be resolved from this server.', 'linksolva-broken-link-checker' );
 		} elseif ( false !== strpos( $haystack, 'timed out' ) || false !== strpos( $haystack, 'timeout' ) || false !== strpos( $haystack, 'curl error 28' ) ) {
 			$status      = 'timeout';
 			$category    = 'timeout';
-			$title       = __( 'Timeout', 'simple-broken-link-checker' );
-			$explanation = __( 'The server did not respond within the configured timeout.', 'simple-broken-link-checker' );
+			$title       = __( 'Timeout', 'linksolva-broken-link-checker' );
+			$explanation = __( 'The server did not respond within the configured timeout.', 'linksolva-broken-link-checker' );
 		}
 		return self::result( $status, 'unverified', 0, $url, $category, $title, $explanation, $redirects, $history, $duration, $stored_retry, $url, $redirect_count, $next );
 	}
@@ -643,6 +643,6 @@ final class Http_Checker {
 			503 => 'Service Unavailable',
 			504 => 'Gateway Timeout',
 		);
-		return isset( $names[ $code ] ) ? $names[ $code ] : ( $code ? 'HTTP ' . absint( $code ) : __( 'No response', 'simple-broken-link-checker' ) );
+		return isset( $names[ $code ] ) ? $names[ $code ] : ( $code ? 'HTTP ' . absint( $code ) : __( 'No response', 'linksolva-broken-link-checker' ) );
 	}
 }

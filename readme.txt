@@ -1,10 +1,10 @@
-=== Simple Broken Link Checker ===
+=== LinkSolva - Broken Link Checker ===
 Contributors: shahidirfan100
 Tags: broken links, link checker, broken images, redirects, local scanner
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.9
+Stable tag: 1.0.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Find broken links, redirects, and missing images locally with evidence, safe ret
 
 == Description ==
 
-Simple Broken Link Checker is a local WordPress tool for administrators who need to know what is genuinely broken before changing content.
+LinkSolva - Broken Link Checker is a local WordPress tool for administrators who need to know what is genuinely broken before changing content.
 
 It discovers URLs in public posts, pages, public custom post types, approved comments, custom navigation menus, featured images, and optionally scalar custom-field or page-builder data. It stores each unique URL separately from the places where it appears, so the same destination is verified once while all source locations remain available.
 
@@ -50,7 +50,7 @@ This plugin does not create a remote account or transmit data to the developer. 
 
 == Installation ==
 
-1. Upload the `simple-broken-link-checker` folder to `/wp-content/plugins/`, or install the ZIP from **Plugins → Add New → Upload Plugin**.
+1. Upload the `linksolva-broken-link-checker` folder to `/wp-content/plugins/`, or install the ZIP from **Plugins → Add New → Upload Plugin**.
 2. Activate the plugin.
 3. Open **Link Checker → Findings**.
 4. Review **Link Checker → Settings** before starting a large scan.
@@ -97,6 +97,9 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 * WordPress cron may be delayed or disabled by hosting configuration. The findings screen provides manual worker progress.
 
 == Changelog ==
+
+= 1.0.10 =
+* Updated the plugin name, directory slug, translation domain, and matching directory graphics for the WordPress.org resubmission.
 
 = 1.0.9 =
 * Cleared the scan worker lock when the plugin is deactivated or uninstalled, including when findings are retained.
@@ -155,6 +158,9 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 * Added evidence-based HTTP classifications, URL deduplication, bounded scanning, safe repairs, and conflict-aware undo.
 
 == Upgrade Notice ==
+
+= 1.0.10 =
+The plugin now uses the LinkSolva brand and its matching WordPress.org directory slug.
 
 = 1.0.9 =
 Scan worker locks are cleared on deactivation and uninstall. Repairs now require permission to edit the affected WordPress source.

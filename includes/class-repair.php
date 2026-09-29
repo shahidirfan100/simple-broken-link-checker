@@ -2,10 +2,10 @@
 /**
  * Safe source editing with audit records and conflict-aware undo.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -24,23 +24,23 @@ final class Repair {
 	public static function apply( $occurrence_id, $operation, $new_url = '' ) {
 		$occurrence = Database::get_occurrence( $occurrence_id );
 		if ( ! $occurrence ) {
-			return new \WP_Error( 'sblc_occurrence_missing', __( 'The selected source occurrence was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_occurrence_missing', __( 'The selected source occurrence was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		if ( ! $occurrence->editable ) {
-			return new \WP_Error( 'sblc_source_read_only', __( 'This source is read-only. The plugin will not modify builder or metadata data automatically.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+			return new \WP_Error( 'sblc_source_read_only', __( 'This source is read-only. The plugin will not modify builder or metadata data automatically.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 		}
 		$operation = sanitize_key( $operation );
 		if ( ! in_array( $operation, array( 'replace', 'unlink', 'nofollow' ), true ) ) {
-			return new \WP_Error( 'sblc_operation_invalid', __( 'This repair action is not supported.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+			return new \WP_Error( 'sblc_operation_invalid', __( 'This repair action is not supported.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 		}
 		if ( ! self::can_edit( $occurrence ) ) {
-			return new \WP_Error( 'sblc_edit_forbidden', __( 'You do not have permission to edit this source.', 'simple-broken-link-checker' ), array( 'status' => 403 ) );
+			return new \WP_Error( 'sblc_edit_forbidden', __( 'You do not have permission to edit this source.', 'linksolva-broken-link-checker' ), array( 'status' => 403 ) );
 		}
 
 		$resource = Database::get_resource( $occurrence->resource_id );
 		$before   = self::source_value( $occurrence );
 		if ( null === $before ) {
-			return new \WP_Error( 'sblc_source_missing', __( 'The source content could not be loaded.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_source_missing', __( 'The source content could not be loaded.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		$target          = $resource ? $resource->url : $occurrence->raw_url;
 		$old_resource_id = absint( $occurrence->resource_id );
@@ -54,18 +54,18 @@ final class Repair {
 		if ( 'replace' === $operation ) {
 			$replacement = Url::normalize( $new_url, $occurrence->source_url );
 			if ( ! $replacement ) {
-				return new \WP_Error( 'sblc_replacement_invalid', __( 'Enter a valid HTTP or HTTPS replacement URL.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+				return new \WP_Error( 'sblc_replacement_invalid', __( 'Enter a valid HTTP or HTTPS replacement URL.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 			}
 			$new_resource_id = Database::upsert_resource( $replacement, $resource ? $resource->resource_type : 'link', $scan_id );
 			if ( ! $new_resource_id ) {
-				return new \WP_Error( 'sblc_replacement_prepare_failed', __( 'The replacement URL could not be prepared for verification. The source was not changed.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+				return new \WP_Error( 'sblc_replacement_prepare_failed', __( 'The replacement URL could not be prepared for verification. The source was not changed.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 			}
 			$verification = Http_Checker::check( $replacement );
 			if ( ! in_array( $verification['status'], array( 'healthy', 'redirect' ), true ) ) {
 				Database::retire_resource_if_orphaned( $new_resource_id );
 				return new \WP_Error(
 					'sblc_replacement_not_verified',
-					__( 'The replacement URL did not return healthy or redirect evidence, so the original source was not changed.', 'simple-broken-link-checker' ),
+					__( 'The replacement URL did not return healthy or redirect evidence, so the original source was not changed.', 'linksolva-broken-link-checker' ),
 					array(
 						'status'      => 422,
 						'sblc_status' => $verification['status'],
@@ -78,13 +78,13 @@ final class Repair {
 
 		if ( 'menu_item' === $occurrence->source_type ) {
 			if ( 'replace' !== $operation ) {
-				return new \WP_Error( 'sblc_menu_action_invalid', __( 'Only URL replacement is supported for menu items.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+				return new \WP_Error( 'sblc_menu_action_invalid', __( 'Only URL replacement is supported for menu items.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 			}
 			$menu_post = get_post( $occurrence->source_id );
 			$item      = $menu_post ? wp_setup_nav_menu_item( $menu_post ) : false;
 			$current   = $item && isset( $item->url ) ? $item->url : '';
 			if ( ! $current || ! self::urls_match( $current, $occurrence->raw_url, $occurrence->source_url ) ) {
-				return new \WP_Error( 'sblc_source_changed', __( 'The menu item changed since this finding was recorded. Recheck it before editing.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+				return new \WP_Error( 'sblc_source_changed', __( 'The menu item changed since this finding was recorded. Recheck it before editing.', 'linksolva-broken-link-checker' ), array( 'status' => 409 ) );
 			}
 			$after = $replacement;
 		} else {
@@ -93,10 +93,10 @@ final class Repair {
 				return $after;
 			}
 			if ( $after === $before ) {
-				return new \WP_Error( 'sblc_no_change', __( 'No source content was changed.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+				return new \WP_Error( 'sblc_no_change', __( 'No source content was changed.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 			}
 			if ( ! in_array( $occurrence->source_type, array( 'post', 'comment' ), true ) ) {
-				return new \WP_Error( 'sblc_source_unsupported', __( 'This source type does not have a safe editor.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+				return new \WP_Error( 'sblc_source_unsupported', __( 'This source type does not have a safe editor.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 			}
 		}
 
@@ -120,7 +120,7 @@ final class Repair {
 			)
 		);
 		if ( ! $repair_id ) {
-			return new \WP_Error( 'sblc_audit_failed', __( 'The source was not changed because the undo record could not be created.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'sblc_audit_failed', __( 'The source was not changed because the undo record could not be created.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 		}
 
 		$result = self::save_source( $occurrence, $after );
@@ -132,10 +132,10 @@ final class Repair {
 				$repair_id,
 				array(
 					'undone'     => 1,
-					'undo_error' => __( 'The repair was not applied because WordPress could not save the source.', 'simple-broken-link-checker' ),
+					'undo_error' => __( 'The repair was not applied because WordPress could not save the source.', 'linksolva-broken-link-checker' ),
 				)
 			);
-			return new \WP_Error( 'sblc_update_failed', __( 'WordPress could not save the repaired source.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'sblc_update_failed', __( 'WordPress could not save the repaired source.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 		}
 
 		if ( 'replace' === $operation ) {
@@ -154,10 +154,10 @@ final class Repair {
 					$repair_id,
 					array(
 						'undone'     => 1,
-						'undo_error' => __( 'The source was restored because its resource index could not be updated.', 'simple-broken-link-checker' ),
+						'undo_error' => __( 'The source was restored because its resource index could not be updated.', 'linksolva-broken-link-checker' ),
 					)
 				);
-				return new \WP_Error( 'sblc_index_update_failed', __( 'The source was restored because the replacement could not be indexed.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+				return new \WP_Error( 'sblc_index_update_failed', __( 'The source was restored because the replacement could not be indexed.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 			}
 			Database::update_resource(
 				$new_resource_id,
@@ -175,7 +175,7 @@ final class Repair {
 				'resource_id' => $new_resource_id,
 				'status'      => $verification['status'],
 				'http_code'   => $verification['http_code'],
-				'message'     => __( 'The source was updated, the replacement was verified, and the old finding was removed when no sources still used it.', 'simple-broken-link-checker' ),
+				'message'     => __( 'The source was updated, the replacement was verified, and the old finding was removed when no sources still used it.', 'linksolva-broken-link-checker' ),
 			);
 		}
 
@@ -184,7 +184,7 @@ final class Repair {
 			Database::retire_resource_if_orphaned( $old_resource_id );
 			return array(
 				'repair_id' => $repair_id,
-				'message'   => __( 'The link was unlinked and removed from the finding when no sources still used it.', 'simple-broken-link-checker' ),
+				'message'   => __( 'The link was unlinked and removed from the finding when no sources still used it.', 'linksolva-broken-link-checker' ),
 			);
 		}
 
@@ -193,8 +193,8 @@ final class Repair {
 			array(
 				'status'          => 'unverified',
 				'confidence'      => 'unverified',
-				'status_text'     => __( 'Recheck needed', 'simple-broken-link-checker' ),
-				'explanation'     => __( 'The source was changed. Recheck this resource to collect fresh evidence.', 'simple-broken-link-checker' ),
+				'status_text'     => __( 'Recheck needed', 'linksolva-broken-link-checker' ),
+				'explanation'     => __( 'The source was changed. Recheck this resource to collect fresh evidence.', 'linksolva-broken-link-checker' ),
 				'checked_scan_id' => 0,
 				'last_checked'    => null,
 				'next_check_at'   => null,
@@ -203,7 +203,7 @@ final class Repair {
 		);
 		return array(
 			'repair_id' => $repair_id,
-			'message'   => __( 'The source was updated and the change was recorded for undo.', 'simple-broken-link-checker' ),
+			'message'   => __( 'The source was updated and the change was recorded for undo.', 'linksolva-broken-link-checker' ),
 		);
 	}
 
@@ -216,10 +216,10 @@ final class Repair {
 	public static function undo( $repair_id ) {
 		$repair = Database::get_repair( $repair_id );
 		if ( ! $repair ) {
-			return new \WP_Error( 'sblc_repair_missing', __( 'The repair record was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_repair_missing', __( 'The repair record was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		if ( $repair->undone ) {
-			return new \WP_Error( 'sblc_already_undone', __( 'This repair has already been undone.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+			return new \WP_Error( 'sblc_already_undone', __( 'This repair has already been undone.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 		}
 		$occurrence        = Database::get_occurrence( $repair->occurrence_id );
 		$stored_occurrence = (bool) $occurrence;
@@ -232,16 +232,16 @@ final class Repair {
 			);
 		}
 		if ( ! $occurrence || ! self::can_edit( $occurrence ) ) {
-			return new \WP_Error( 'sblc_edit_forbidden', __( 'You do not have permission to undo this repair.', 'simple-broken-link-checker' ), array( 'status' => 403 ) );
+			return new \WP_Error( 'sblc_edit_forbidden', __( 'You do not have permission to undo this repair.', 'linksolva-broken-link-checker' ), array( 'status' => 403 ) );
 		}
 		$current = self::source_value( $occurrence );
 		if ( null === $current || hash( 'sha256', $current ) !== $repair->after_checksum ) {
-			Database::update_repair( $repair_id, array( 'undo_error' => __( 'Undo was blocked because the source changed after this repair.', 'simple-broken-link-checker' ) ) );
-			return new \WP_Error( 'sblc_undo_conflict', __( 'Undo was blocked because the source changed after this repair. Review the source manually.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+			Database::update_repair( $repair_id, array( 'undo_error' => __( 'Undo was blocked because the source changed after this repair.', 'linksolva-broken-link-checker' ) ) );
+			return new \WP_Error( 'sblc_undo_conflict', __( 'Undo was blocked because the source changed after this repair. Review the source manually.', 'linksolva-broken-link-checker' ), array( 'status' => 409 ) );
 		}
 		$result = self::save_source( $occurrence, $repair->before_value );
 		if ( is_wp_error( $result ) || false === $result || 0 === $result ) {
-			return new \WP_Error( 'sblc_undo_failed', __( 'WordPress could not restore the original source.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'sblc_undo_failed', __( 'WordPress could not restore the original source.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 		}
 
 		/*
@@ -273,8 +273,8 @@ final class Repair {
 					)
 				);
 				if ( ! $mapped ) {
-					Database::update_repair( $repair_id, array( 'undo_error' => __( 'The source was restored, but its resource index could not be restored. Review the finding before scanning again.', 'simple-broken-link-checker' ) ) );
-					return new \WP_Error( 'sblc_undo_index_failed', __( 'The source was restored, but the finding index could not be restored.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+					Database::update_repair( $repair_id, array( 'undo_error' => __( 'The source was restored, but its resource index could not be restored. Review the finding before scanning again.', 'linksolva-broken-link-checker' ) ) );
+					return new \WP_Error( 'sblc_undo_index_failed', __( 'The source was restored, but the finding index could not be restored.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 				}
 				if ( $current_resource_id && $current_resource_id !== $old_resource_id ) {
 					Database::retire_resource_if_orphaned( $current_resource_id );
@@ -291,7 +291,7 @@ final class Repair {
 				'undo_error' => '',
 			)
 		);
-		return array( 'message' => __( 'The original source was restored.', 'simple-broken-link-checker' ) );
+		return array( 'message' => __( 'The original source was restored.', 'linksolva-broken-link-checker' ) );
 	}
 
 	/**

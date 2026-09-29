@@ -2,10 +2,10 @@
 /**
  * Install, upgrade, and lifecycle operations.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -38,7 +38,7 @@ final class Installer {
 	public static function cron_schedules( $schedules ) {
 		$schedules['sblc_minute'] = array(
 			'interval' => MINUTE_IN_SECONDS,
-			'display'  => __( 'Every minute (Simple Broken Link Checker)', 'simple-broken-link-checker' ),
+			'display'  => __( 'Every minute (LinkSolva - Broken Link Checker)', 'linksolva-broken-link-checker' ),
 		);
 		return $schedules;
 	}

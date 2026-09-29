@@ -2,10 +2,10 @@
 /**
  * Small data-access layer for plugin-owned tables.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -83,8 +83,8 @@ final class Database {
 							'confidence'      => 'pending',
 							'http_code'       => 0,
 							'error_code'      => '',
-							'status_text'     => __( 'Queued', 'simple-broken-link-checker' ),
-							'explanation'     => __( 'This URL has been rediscovered and is waiting for its verification request.', 'simple-broken-link-checker' ),
+							'status_text'     => __( 'Queued', 'linksolva-broken-link-checker' ),
+							'explanation'     => __( 'This URL has been rediscovered and is waiting for its verification request.', 'linksolva-broken-link-checker' ),
 							'final_url'       => '',
 							'redirect_chain'  => '',
 							'request_history' => '',
@@ -113,8 +113,8 @@ final class Database {
 				'link_scope'    => $scope,
 				'status'        => 'pending',
 				'confidence'    => 'pending',
-				'status_text'   => __( 'Queued', 'simple-broken-link-checker' ),
-				'explanation'   => __( 'This URL has been discovered and is waiting for its verification request.', 'simple-broken-link-checker' ),
+				'status_text'   => __( 'Queued', 'linksolva-broken-link-checker' ),
+				'explanation'   => __( 'This URL has been discovered and is waiting for its verification request.', 'linksolva-broken-link-checker' ),
 				'first_seen'    => $now,
 				'last_seen'     => $now,
 				'last_scan_id'  => absint( $scan_id ),
@@ -426,8 +426,8 @@ final class Database {
 				'manual_verified' => 0,
 				'status'          => 'unverified',
 				'confidence'      => 'unverified',
-				'status_text'     => __( 'Recheck needed', 'simple-broken-link-checker' ),
-				'explanation'     => __( 'The source was restored. Recheck this resource to collect fresh evidence.', 'simple-broken-link-checker' ),
+				'status_text'     => __( 'Recheck needed', 'linksolva-broken-link-checker' ),
+				'explanation'     => __( 'The source was restored. Recheck this resource to collect fresh evidence.', 'linksolva-broken-link-checker' ),
 				'last_checked'    => null,
 				'next_check_at'   => null,
 				'retry_count'     => 0,

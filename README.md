@@ -1,4 +1,4 @@
-# Simple Broken Link Checker
+# LinkSolva - Broken Link Checker
 
 Local WordPress link verification with evidence-based classifications, URL deduplication, bounded scans, and conflict-aware repairs.
 

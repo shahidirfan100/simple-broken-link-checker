@@ -2,10 +2,10 @@
 /**
  * WordPress source adapters.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -187,7 +187,7 @@ final class Sources {
 				'source_id'    => (int) $comment->comment_ID,
 				'source_field' => 'comment_content',
 				/* translators: %s: Title of the post that received the comment. */
-				'source_title' => sprintf( __( 'Comment on %s', 'simple-broken-link-checker' ), get_the_title( $comment->comment_post_ID ) ),
+				'source_title' => sprintf( __( 'Comment on %s', 'linksolva-broken-link-checker' ), get_the_title( $comment->comment_post_ID ) ),
 				'source_url'   => get_comment_link( $comment ),
 				'content'      => $comment->comment_content,
 				'editable'     => true,

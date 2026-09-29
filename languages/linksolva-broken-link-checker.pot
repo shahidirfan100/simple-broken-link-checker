@@ -2,48 +2,48 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Simple Broken Link Checker 1.0.9\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/simple-broken-link-checker\n"
+"Project-Id-Version: LinkSolva - Broken Link Checker 1.0.10\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/linksolva-broken-link-checker\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-29T06:35:36+00:00\n"
+"POT-Creation-Date: 2026-09-29T13:22:28+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
-"X-Domain: simple-broken-link-checker\n"
+"X-Domain: linksolva-broken-link-checker\n"
 
 #. Plugin Name of the plugin
-#: simple-broken-link-checker.php
+#: linksolva-broken-link-checker.php
 #: admin/class-admin.php:24
 #: admin/class-admin.php:206
-msgid "Simple Broken Link Checker"
+msgid "LinkSolva - Broken Link Checker"
 msgstr ""
 
 #. Plugin URI of the plugin
-#: simple-broken-link-checker.php
+#: linksolva-broken-link-checker.php
 msgid "https://github.com/shahidirfan100/simple-broken-link-checker"
 msgstr ""
 
 #. Description of the plugin
-#: simple-broken-link-checker.php
+#: linksolva-broken-link-checker.php
 msgid "Find and review broken links, redirects, and missing images locally with clear evidence and safe repairs."
 msgstr ""
 
 #. Author of the plugin
-#: simple-broken-link-checker.php
+#: linksolva-broken-link-checker.php
 msgid "Shahid Irfan"
 msgstr ""
 
 #. Author URI of the plugin
-#: simple-broken-link-checker.php
+#: linksolva-broken-link-checker.php
 msgid "https://profiles.wordpress.org/shahidirfan100/"
 msgstr ""
 
 #: admin/class-admin.php:24
 #: admin/class-admin.php:25
-msgid "Link Checker"
+msgid "LinkSolva"
 msgstr ""
 
 #: admin/class-admin.php:25
@@ -732,7 +732,7 @@ msgid "No response"
 msgstr ""
 
 #: includes/class-installer.php:41
-msgid "Every minute (Simple Broken Link Checker)"
+msgid "Every minute (LinkSolva - Broken Link Checker)"
 msgstr ""
 
 #: includes/class-repair.php:27
@@ -856,7 +856,7 @@ msgid "The original source was restored."
 msgstr ""
 
 #: includes/class-rest.php:143
-msgid "You are not allowed to use Simple Broken Link Checker."
+msgid "You are not allowed to use LinkSolva - Broken Link Checker."
 msgstr ""
 
 #: includes/class-rest.php:187
@@ -949,7 +949,7 @@ msgid "Scan stopped."
 msgstr ""
 
 #: includes/class-scanner.php:501
-msgid "Simple Broken Link Checker scan complete"
+msgid "LinkSolva - Broken Link Checker scan complete"
 msgstr ""
 
 #. translators: 1: Unique URL count, 2: Broken count, 3: Needs-review count, 4: Redirect count, 5: Healthy count.

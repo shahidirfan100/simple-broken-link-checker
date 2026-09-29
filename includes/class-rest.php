@@ -2,10 +2,10 @@
 /**
  * Privileged REST API for the admin application.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -140,7 +140,7 @@ final class Rest {
 		if ( current_user_can( 'manage_options' ) ) {
 			return true;
 		}
-		return new \WP_Error( 'sblc_forbidden', __( 'You are not allowed to use Simple Broken Link Checker.', 'simple-broken-link-checker' ), array( 'status' => rest_authorization_required_code() ) );
+		return new \WP_Error( 'sblc_forbidden', __( 'You are not allowed to use LinkSolva - Broken Link Checker.', 'linksolva-broken-link-checker' ), array( 'status' => rest_authorization_required_code() ) );
 	}
 
 	/**
@@ -184,7 +184,7 @@ final class Rest {
 	public static function resource( $request ) {
 		$resource = Database::get_resource( absint( $request->get_param( 'id' ) ) );
 		if ( ! $resource ) {
-			return new \WP_Error( 'sblc_resource_missing', __( 'The requested resource was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_resource_missing', __( 'The requested resource was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		$data                    = self::object_to_array( $resource );
 		$data['redirect_chain']  = self::decode( $resource->redirect_chain );
@@ -239,7 +239,7 @@ final class Rest {
 		$action   = sanitize_key( $request->get_param( 'action' ) );
 		$resource = Database::get_resource( $id );
 		if ( ! $resource ) {
-			return new \WP_Error( 'sblc_resource_missing', __( 'The requested resource was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_resource_missing', __( 'The requested resource was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		switch ( $action ) {
 			case 'recheck':
@@ -260,8 +260,8 @@ final class Rest {
 						'ignored'         => 1,
 						'status'          => 'ignored',
 						'confidence'      => 'unverified',
-						'status_text'     => __( 'Ignored', 'simple-broken-link-checker' ),
-						'explanation'     => __( 'This resource is hidden from action-focused filters until it is restored.', 'simple-broken-link-checker' ),
+						'status_text'     => __( 'Ignored', 'linksolva-broken-link-checker' ),
+						'explanation'     => __( 'This resource is hidden from action-focused filters until it is restored.', 'linksolva-broken-link-checker' ),
 						'manual_verified' => 0,
 					)
 				);
@@ -273,8 +273,8 @@ final class Rest {
 						'ignored'         => 0,
 						'status'          => 'unverified',
 						'confidence'      => 'unverified',
-						'status_text'     => __( 'Recheck needed', 'simple-broken-link-checker' ),
-						'explanation'     => __( 'The resource was restored to the review queue.', 'simple-broken-link-checker' ),
+						'status_text'     => __( 'Recheck needed', 'linksolva-broken-link-checker' ),
+						'explanation'     => __( 'The resource was restored to the review queue.', 'linksolva-broken-link-checker' ),
 						'checked_scan_id' => 0,
 						'manual_verified' => 0,
 						'next_check_at'   => null,
@@ -290,15 +290,15 @@ final class Rest {
 						'manual_verified' => 1,
 						'status'          => 'healthy',
 						'confidence'      => 'manual',
-						'status_text'     => __( 'Manually verified', 'simple-broken-link-checker' ),
-						'explanation'     => __( 'An administrator marked this resource as verified without an automated request.', 'simple-broken-link-checker' ),
+						'status_text'     => __( 'Manually verified', 'linksolva-broken-link-checker' ),
+						'explanation'     => __( 'An administrator marked this resource as verified without an automated request.', 'linksolva-broken-link-checker' ),
 						'last_checked'    => Database::now(),
 						'next_check_at'   => null,
 					)
 				);
 				break;
 			default:
-				return new \WP_Error( 'sblc_action_invalid', __( 'This resource action is not supported.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+				return new \WP_Error( 'sblc_action_invalid', __( 'This resource action is not supported.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 		}
 		$detail_request = new \WP_REST_Request( 'GET', '/sblc/v1/resource/' . $id );
 		$detail_request->set_param( 'id', $id );
@@ -316,7 +316,7 @@ final class Rest {
 		$ids    = is_array( $ids ) ? array_slice( array_values( array_filter( array_map( 'absint', $ids ) ) ), 0, 100 ) : array();
 		$action = sanitize_key( $request->get_param( 'action' ) );
 		if ( empty( $ids ) || ! in_array( $action, array( 'ignore', 'restore', 'recheck' ), true ) ) {
-			return new \WP_Error( 'sblc_bulk_invalid', __( 'Choose valid resources and an action.', 'simple-broken-link-checker' ), array( 'status' => 400 ) );
+			return new \WP_Error( 'sblc_bulk_invalid', __( 'Choose valid resources and an action.', 'linksolva-broken-link-checker' ), array( 'status' => 400 ) );
 		}
 		foreach ( $ids as $id ) {
 			if ( 'recheck' === $action ) {
@@ -327,8 +327,8 @@ final class Rest {
 						'manual_verified' => 0,
 						'status'          => 'unverified',
 						'confidence'      => 'unverified',
-						'status_text'     => __( 'Queued for recheck', 'simple-broken-link-checker' ),
-						'explanation'     => __( 'This resource will be checked by the next scan.', 'simple-broken-link-checker' ),
+						'status_text'     => __( 'Queued for recheck', 'linksolva-broken-link-checker' ),
+						'explanation'     => __( 'This resource will be checked by the next scan.', 'linksolva-broken-link-checker' ),
 						'checked_scan_id' => 0,
 						'next_check_at'   => null,
 						'retry_count'     => 0,
@@ -341,7 +341,7 @@ final class Rest {
 						'ignored'     => 1,
 						'status'      => 'ignored',
 						'confidence'  => 'unverified',
-						'status_text' => __( 'Ignored', 'simple-broken-link-checker' ),
+						'status_text' => __( 'Ignored', 'linksolva-broken-link-checker' ),
 					)
 				);
 			} else {
@@ -359,7 +359,7 @@ final class Rest {
 				);
 			}
 		}
-		return array( 'message' => __( 'The selected resources were updated.', 'simple-broken-link-checker' ) );
+		return array( 'message' => __( 'The selected resources were updated.', 'linksolva-broken-link-checker' ) );
 	}
 
 	/**

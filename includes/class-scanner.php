@@ -2,10 +2,10 @@
 /**
  * Resumable local discovery and verification worker.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -24,16 +24,16 @@ final class Scanner {
 	public static function start() {
 		$active = Database::get_active_scan();
 		if ( $active ) {
-			return new \WP_Error( 'sblc_scan_active', __( 'A scan is already in progress.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+			return new \WP_Error( 'sblc_scan_active', __( 'A scan is already in progress.', 'linksolva-broken-link-checker' ), array( 'status' => 409 ) );
 		}
 		if ( ! self::acquire_lock() ) {
-			return new \WP_Error( 'sblc_scan_locked', __( 'Another scan request is being started. Please try again.', 'simple-broken-link-checker' ), array( 'status' => 409 ) );
+			return new \WP_Error( 'sblc_scan_locked', __( 'Another scan request is being started. Please try again.', 'linksolva-broken-link-checker' ), array( 'status' => 409 ) );
 		}
 		Database::reset_for_scan();
 		$scan_id = Database::insert_scan();
 		if ( ! $scan_id ) {
 			self::release_lock();
-			return new \WP_Error( 'sblc_scan_create_failed', __( 'The scan could not be created.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'sblc_scan_create_failed', __( 'The scan could not be created.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 		}
 		self::set_lock_scan( $scan_id );
 		return self::step( $scan_id );
@@ -49,7 +49,7 @@ final class Scanner {
 		$worker_lock = self::acquire_worker_lock();
 		if ( ! $worker_lock ) {
 			$scan = Database::get_scan( $scan_id );
-			return $scan ? self::progress( $scan ) : new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return $scan ? self::progress( $scan ) : new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 
 		try {
@@ -68,7 +68,7 @@ final class Scanner {
 	private static function process_step( $scan_id ) {
 		$scan = Database::get_scan( $scan_id );
 		if ( ! $scan ) {
-			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		if ( in_array( $scan->state, array( 'completed', 'cancelled', 'failed' ), true ) ) {
 			return self::progress( $scan );
@@ -139,7 +139,7 @@ final class Scanner {
 				)
 			);
 			self::release_lock();
-			return new \WP_Error( 'sblc_scan_failed', __( 'The scan stopped unexpectedly. Existing findings were preserved.', 'simple-broken-link-checker' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'sblc_scan_failed', __( 'The scan stopped unexpectedly. Existing findings were preserved.', 'linksolva-broken-link-checker' ), array( 'status' => 500 ) );
 		}
 	}
 
@@ -152,7 +152,7 @@ final class Scanner {
 	public static function cancel( $scan_id ) {
 		$scan = Database::get_scan( $scan_id );
 		if ( ! $scan ) {
-			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'simple-broken-link-checker' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'sblc_scan_missing', __( 'The requested scan was not found.', 'linksolva-broken-link-checker' ), array( 'status' => 404 ) );
 		}
 		Database::update_scan( $scan_id, array( 'state' => 'cancelling' ) );
 		return self::step( $scan_id );
@@ -318,7 +318,7 @@ final class Scanner {
 				'state'   => 'idle',
 				'phase'   => 'idle',
 				'percent' => 0,
-				'message' => __( 'No scan has been run yet.', 'simple-broken-link-checker' ),
+				'message' => __( 'No scan has been run yet.', 'linksolva-broken-link-checker' ),
 				'counts'  => Database::counts(),
 				'stats'   => array(
 					'total_resources'   => 0,
@@ -339,16 +339,16 @@ final class Scanner {
 		if ( 'discovering' === $scan->state ) {
 			if ( 'verification' === $phase ) {
 				/* translators: 1: checked URL count, 2: discovered URL count. */
-				$message = sprintf( __( 'Verifying discovered URLs before reading more sources (%1$d of %2$d complete).', 'simple-broken-link-checker' ), absint( $stats['checked_resources'] ), absint( $stats['total_resources'] ) );
+				$message = sprintf( __( 'Verifying discovered URLs before reading more sources (%1$d of %2$d complete).', 'linksolva-broken-link-checker' ), absint( $stats['checked_resources'] ), absint( $stats['total_resources'] ) );
 			} else {
-				$message = __( 'Reading WordPress content. Each URL is verified before more sources are fetched.', 'simple-broken-link-checker' );
+				$message = __( 'Reading WordPress content. Each URL is verified before more sources are fetched.', 'linksolva-broken-link-checker' );
 			}
 		} elseif ( 'checking' === $scan->state ) {
-			$message = __( 'Verifying unique URLs with bounded local requests.', 'simple-broken-link-checker' );
+			$message = __( 'Verifying unique URLs with bounded local requests.', 'linksolva-broken-link-checker' );
 		} elseif ( 'completed' === $scan->state ) {
-			$message = __( 'Scan completed.', 'simple-broken-link-checker' );
+			$message = __( 'Scan completed.', 'linksolva-broken-link-checker' );
 		} else {
-			$message = __( 'Scan stopped.', 'simple-broken-link-checker' );
+			$message = __( 'Scan stopped.', 'linksolva-broken-link-checker' );
 		}
 		return array(
 			'scan_id'                => absint( $scan->id ),
@@ -498,10 +498,10 @@ final class Scanner {
 			return;
 		}
 		$counts  = Database::counts();
-		$subject = __( 'Simple Broken Link Checker scan complete', 'simple-broken-link-checker' );
+		$subject = __( 'LinkSolva - Broken Link Checker scan complete', 'linksolva-broken-link-checker' );
 		$message = sprintf(
 			/* translators: 1: Unique URL count, 2: Broken count, 3: Needs-review count, 4: Redirect count, 5: Healthy count. */
-			__( "Your local link scan is complete.\n\nUnique URLs: %1\$d\nBroken: %2\$d\nNeeds review: %3\$d\nRedirects: %4\$d\nHealthy: %5\$d\n\nOpen the WordPress admin to review evidence and source locations.", 'simple-broken-link-checker' ),
+			__( "Your local link scan is complete.\n\nUnique URLs: %1\$d\nBroken: %2\$d\nNeeds review: %3\$d\nRedirects: %4\$d\nHealthy: %5\$d\n\nOpen the WordPress admin to review evidence and source locations.", 'linksolva-broken-link-checker' ),
 			absint( $counts['all'] ),
 			absint( $counts['broken'] ),
 			absint( $counts['needs_review'] ),

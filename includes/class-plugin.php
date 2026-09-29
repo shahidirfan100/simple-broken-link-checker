@@ -2,12 +2,12 @@
 /**
  * Plugin coordinator.
  *
- * @package SimpleBrokenLinkChecker
+ * @package LinkSolvaBrokenLinkChecker
  */
 
-namespace SimpleBrokenLinkChecker;
+namespace LinkSolva\BrokenLinkChecker;
 
-use SimpleBrokenLinkChecker\Admin\Admin;
+use LinkSolva\BrokenLinkChecker\Admin\Admin;
 
 defined( 'ABSPATH' ) || exit;
 

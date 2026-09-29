@@ -1,7 +1,7 @@
 (function (window, document) {
 	'use strict';
 
-	var config = window.SBLC_DATA || {};
+	var config = window.LINKSOLVA_BLC_DATA || {};
 	var root = document.getElementById('sblc-app');
 	if (!root) {
 		return;
@@ -19,8 +19,6 @@
 		monitorTimer: null,
 		lastProgress: null
 	};
-
-	window.SBLC = window.SBLC || {};
 
 	function t(value) {
 		return config.strings && config.strings[value] ? config.strings[value] : value;
