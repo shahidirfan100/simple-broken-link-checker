@@ -51,6 +51,7 @@ final class Installer {
 	public static function deactivate() {
 		wp_clear_scheduled_hook( 'sblc_worker' );
 		delete_option( 'sblc_scan_lock' );
+		delete_option( 'sblc_scan_worker_lock' );
 		delete_option( 'sblc_next_scan_at' );
 	}
 

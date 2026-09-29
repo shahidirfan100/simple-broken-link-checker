@@ -4,7 +4,7 @@ Tags: broken links, link checker, broken images, redirects, local scanner
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -100,6 +100,12 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 
 == Changelog ==
 
+= 1.0.9 =
+* Cleared the scan worker lock when the plugin is deactivated or uninstalled, including when findings are retained.
+* Required the relevant WordPress source-edit capability before applying or undoing a repair.
+* Reused the initial URL safety decision within a parallel batch to avoid an extra DNS validation for each result.
+* Paginated navigation-menu discovery so each worker loads only the current small batch of menu items.
+
 = 1.0.8 =
 * Stopped issuing an immediate GET request after a HEAD network failure or timeout; the URL is recorded as unverified and retried later so the scan can continue.
 * Kept batch transport failures and missing responses from triggering a second sequential network attempt.
@@ -151,6 +157,9 @@ No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 * Added evidence-based HTTP classifications, URL deduplication, bounded scanning, safe repairs, and conflict-aware undo.
 
 == Upgrade Notice ==
+
+= 1.0.9 =
+Scan worker locks are cleared on deactivation and uninstall. Repairs now require permission to edit the affected WordPress source.
 
 = 1.0.8 =
 Unresponsive destinations no longer cause an immediate duplicate request; scan work moves on and retries them later.

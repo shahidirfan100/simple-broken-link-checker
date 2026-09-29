@@ -69,6 +69,7 @@ final class Http_Checker {
 		$settings      = Settings::all();
 		$results       = array();
 		$requests      = array();
+		$safeties      = array();
 		$starts        = array();
 		$timings       = array();
 		$batch_started = microtime( true );
@@ -91,6 +92,7 @@ final class Http_Checker {
 				continue;
 			}
 			$starts[ $key ]   = $batch_started;
+			$safeties[ $key ] = $safety;
 			$requests[ $key ] = array(
 				'url'     => $entry['url'],
 				'headers' => $args['headers'],
@@ -137,7 +139,7 @@ final class Http_Checker {
 			}
 			$duration        = isset( $timings[ $key ] ) ? $timings[ $key ] : microtime( true ) - $batch_started;
 			$initial         = self::parallel_response( $responses[ $key ], $duration );
-			$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], $initial, $deadline );
+			$results[ $key ] = self::check_with_initial( $entries[ $key ]['url'], $entries[ $key ]['retry'], $initial, $deadline, $safeties[ $key ] );
 		}
 		return $results;
 	}

@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Simple Broken Link Checker 1.0.8\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/github-simple-broken-link-checker\n"
+"Project-Id-Version: Simple Broken Link Checker 1.0.9\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/simple-broken-link-checker\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-25T11:23:55+00:00\n"
+"POT-Creation-Date: 2026-09-29T06:35:36+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: simple-broken-link-checker\n"
@@ -23,7 +23,7 @@ msgstr ""
 
 #. Plugin URI of the plugin
 #: simple-broken-link-checker.php
-msgid "https://wordpress.org/plugins/simple-broken-link-checker/"
+msgid "https://github.com/shahidirfan100/simple-broken-link-checker"
 msgstr ""
 
 #. Description of the plugin
@@ -167,7 +167,7 @@ msgid "DNS Error"
 msgstr ""
 
 #: admin/class-admin.php:80
-#: includes/class-http-checker.php:551
+#: includes/class-http-checker.php:553
 msgid "Timeout"
 msgstr ""
 
@@ -614,120 +614,120 @@ msgstr ""
 msgid "The selected URL was not found in the source content."
 msgstr ""
 
-#: includes/class-http-checker.php:133
+#: includes/class-http-checker.php:135
 msgid "The parallel request returned no response."
 msgstr ""
 
-#: includes/class-http-checker.php:159
-#: includes/class-http-checker.php:546
+#: includes/class-http-checker.php:161
+#: includes/class-http-checker.php:548
 msgid "DNS error"
 msgstr ""
 
-#: includes/class-http-checker.php:159
+#: includes/class-http-checker.php:161
 msgid "Request not sent"
 msgstr ""
 
-#: includes/class-http-checker.php:160
+#: includes/class-http-checker.php:162
 msgid "The domain could not be resolved from this server, so no request was sent."
 msgstr ""
 
-#: includes/class-http-checker.php:160
+#: includes/class-http-checker.php:162
 msgid "This URL was not requested because it failed the local safety checks."
 msgstr ""
 
-#: includes/class-http-checker.php:202
+#: includes/class-http-checker.php:204
 msgid "Verification deferred"
 msgstr ""
 
-#: includes/class-http-checker.php:202
+#: includes/class-http-checker.php:204
 msgid "The HEAD request did not establish the link status, and the worker time limit was reached before a GET request could confirm it."
 msgstr ""
 
 #. translators: %d: Maximum number of allowed redirect hops.
-#: includes/class-http-checker.php:224
+#: includes/class-http-checker.php:226
 #, php-format
 msgid "The link redirected more than the configured limit of %d hops."
 msgstr ""
 
-#: includes/class-http-checker.php:231
+#: includes/class-http-checker.php:233
 msgid "The redirect chain was stopped because its next destination failed the local safety checks."
 msgstr ""
 
-#: includes/class-http-checker.php:243
+#: includes/class-http-checker.php:245
 msgid "Redirect loop"
 msgstr ""
 
-#: includes/class-http-checker.php:243
+#: includes/class-http-checker.php:245
 msgid "The redirect chain returned to a URL that was already visited."
 msgstr ""
 
-#: includes/class-http-checker.php:256
+#: includes/class-http-checker.php:258
 msgid "The URL works, but it reaches a different destination through a redirect chain."
 msgstr ""
 
-#: includes/class-http-checker.php:258
+#: includes/class-http-checker.php:260
 msgid "The resource responded successfully."
 msgstr ""
 
-#: includes/class-http-checker.php:261
+#: includes/class-http-checker.php:263
 msgid "The server returned a redirect that could not be fully followed."
 msgstr ""
 
 #. translators: %d: HTTP response status code, such as 404 or 410.
-#: includes/class-http-checker.php:265
+#: includes/class-http-checker.php:267
 #, php-format
 msgid "The target returned definitive HTTP %d evidence. It is highly likely that the resource no longer exists."
 msgstr ""
 
-#: includes/class-http-checker.php:271
+#: includes/class-http-checker.php:273
 msgid "The remote server asked the scanner to slow down. This does not mean the link is broken."
 msgstr ""
 
-#: includes/class-http-checker.php:277
+#: includes/class-http-checker.php:279
 msgid "The remote server returned a temporary error. The scanner will leave this for a later recheck instead of calling it broken."
 msgstr ""
 
-#: includes/class-http-checker.php:280
+#: includes/class-http-checker.php:282
 msgid "The remote website rejected automated verification. This does not necessarily mean the link is broken."
 msgstr ""
 
-#: includes/class-http-checker.php:282
+#: includes/class-http-checker.php:284
 msgid "The scanner could not obtain enough evidence to call this link broken."
 msgstr ""
 
-#: includes/class-http-checker.php:396
+#: includes/class-http-checker.php:398
 msgid "The redirect was recorded, but the next destination was not requested because this worker reached its time limit."
 msgstr ""
 
-#: includes/class-http-checker.php:455
+#: includes/class-http-checker.php:457
 msgid "The parallel request failed."
 msgstr ""
 
-#: includes/class-http-checker.php:533
+#: includes/class-http-checker.php:535
 msgid "Network error"
 msgstr ""
 
-#: includes/class-http-checker.php:534
+#: includes/class-http-checker.php:536
 msgid "The scanner could not complete a safe request. This is not enough evidence to call the link broken."
 msgstr ""
 
-#: includes/class-http-checker.php:541
+#: includes/class-http-checker.php:543
 msgid "SSL error"
 msgstr ""
 
-#: includes/class-http-checker.php:542
+#: includes/class-http-checker.php:544
 msgid "The HTTPS certificate or TLS negotiation could not be verified."
 msgstr ""
 
-#: includes/class-http-checker.php:547
+#: includes/class-http-checker.php:549
 msgid "The domain could not be resolved from this server."
 msgstr ""
 
-#: includes/class-http-checker.php:552
+#: includes/class-http-checker.php:554
 msgid "The server did not respond within the configured timeout."
 msgstr ""
 
-#: includes/class-http-checker.php:644
+#: includes/class-http-checker.php:646
 msgid "No response"
 msgstr ""
 

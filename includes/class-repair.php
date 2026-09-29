@@ -380,16 +380,13 @@ final class Repair {
 	 * @return bool
 	 */
 	private static function can_edit( $occurrence ) {
-		if ( current_user_can( 'manage_options' ) ) {
-			return true;
-		}
 		if ( 'post' === $occurrence->source_type ) {
 			return current_user_can( 'edit_post', absint( $occurrence->source_id ) );
 		}
 		if ( 'comment' === $occurrence->source_type ) {
 			return current_user_can( 'edit_comment', absint( $occurrence->source_id ) );
 		}
-		return current_user_can( 'edit_theme_options' );
+		return 'menu_item' === $occurrence->source_type && current_user_can( 'edit_theme_options' );
 	}
 
 	/**

@@ -46,7 +46,7 @@ final class Sources {
 			case 'comments':
 				return self::comments( $page, $limit, $offset );
 			case 'menus':
-				return self::menus( $offset, $limit );
+				return self::menus( $page, $limit, $offset );
 			case 'postmeta':
 				return self::postmeta( $page, $limit, $offset );
 			case 'posts':
@@ -203,39 +203,60 @@ final class Sources {
 	/**
 	 * Navigation menu item adapter.
 	 *
-	 * @param int $offset Offset within the menu stream.
+	 * @param int $page   Page.
 	 * @param int $limit  Limit.
+	 * @param int $offset Offset within the current page.
 	 * @return array
 	 */
-	private static function menus( $offset = 0, $limit = 5 ) {
+	private static function menus( $page = 1, $limit = 5, $offset = 0 ) {
+		$menu_ids = wp_list_pluck( wp_get_nav_menus(), 'term_id' );
+		if ( empty( $menu_ids ) ) {
+			return array(
+				'items'         => array(),
+				'page_complete' => true,
+				'has_more'      => false,
+			);
+		}
+		$ids   = get_posts(
+			array(
+				'post_type'        => 'nav_menu_item',
+				'post_status'      => 'publish',
+				'posts_per_page'   => absint( $limit ),
+				'offset'           => ( max( 1, absint( $page ) ) - 1 ) * absint( $limit ),
+				'orderby'          => 'ID',
+				'order'            => 'ASC',
+				'fields'           => 'ids',
+				'suppress_filters' => false,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- Restricts each small menu page to items assigned to an indexed nav_menu term.
+				'tax_query'        => array(
+					array(
+						'taxonomy' => 'nav_menu',
+						'field'    => 'term_id',
+						'terms'    => array_map( 'absint', $menu_ids ),
+					),
+				),
+			)
+		);
 		$items = array();
-		foreach ( wp_get_nav_menus() as $menu ) {
-			$menu_items = wp_get_nav_menu_items( $menu->term_id );
-			if ( ! is_array( $menu_items ) ) {
-				continue;
-			}
-			foreach ( $menu_items as $item ) {
-				if ( empty( $item->url ) ) {
-					continue;
-				}
-				$items[] = array(
-					'source_type'  => 'menu_item',
-					'source_id'    => (int) $item->ID,
-					'source_field' => 'menu_item_url',
-					'source_title' => $item->title ? $item->title : $menu->name,
-					'source_url'   => home_url( '/' ),
-					'content'      => $item->url,
-					'force_type'   => 'link',
-					'editable'     => 'custom' === $item->type,
-				);
-			}
+		foreach ( $ids as $id ) {
+			$item    = wp_setup_nav_menu_item( get_post( $id ) );
+			$items[] = array(
+				'source_type'  => 'menu_item',
+				'source_id'    => absint( $id ),
+				'source_field' => 'menu_item_url',
+				'source_title' => $item && ! empty( $item->title ) ? $item->title : '',
+				'source_url'   => home_url( '/' ),
+				'content'      => $item && ! empty( $item->url ) ? $item->url : '',
+				'force_type'   => 'link',
+				'editable'     => $item && 'custom' === $item->type,
+			);
 		}
 		$all_count = count( $items );
-		$items     = array_slice( $items, absint( $offset ), absint( $limit ) );
+		$items     = array_slice( $items, absint( $offset ) );
 		return array(
 			'items'         => $items,
 			'page_complete' => absint( $offset ) + count( $items ) >= $all_count,
-			'has_more'      => false,
+			'has_more'      => count( $ids ) === absint( $limit ),
 		);
 	}
 
