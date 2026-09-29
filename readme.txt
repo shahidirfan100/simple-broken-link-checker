@@ -82,6 +82,13 @@ Data is retained by default. Enable **Delete findings when the plugin is uninsta
 
 No. Styles and scripts are loaded only on the plugin's WordPress admin screens.
 
+== Screenshots ==
+
+1. Findings dashboard with URL status, source counts, and filters for link scope and resource type.
+2. Broken-link evidence with the HTTP result, request history, and source location.
+3. Redirect evidence showing the final destination and each redirect hop.
+4. Settings for bounded work, parallel checks, timeouts, content sources, and scan scheduling.
+
 == Limitations ==
 
 * Some websites intentionally reject automated verification. A successful browser visit cannot always be reproduced by a server-side request.
