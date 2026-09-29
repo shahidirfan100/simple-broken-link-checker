@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       LinkSolva - Broken Link Checker
- * Plugin URI:        https://github.com/shahidirfan100/simple-broken-link-checker
+ * Plugin URI:        https://github.com/shahidirfan100/linksolva-broken-link-checker
  * Description:       Find and review broken links, redirects, and missing images locally with clear evidence and safe repairs.
  * Version:           1.0.10
  * Requires at least: 6.2
